@@ -29,7 +29,7 @@ const OrbitTrailControl = () => {
                 onClick={() => setIsCollapsed(!isCollapsed)}
             >
                 <SettingOutlined className="panel-icon" />
-                <span className="panel-title">显示设置</span>
+                <span className="panel-title">Display Settings</span>
                 <DownOutlined className="panel-arrow" />
             </div>
 

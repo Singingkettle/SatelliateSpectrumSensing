@@ -37,7 +37,7 @@ const SimulationTimeController = () => {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <ClockCircleOutlined className="panel-icon" />
-        <span className="panel-title">仿真时间控制</span>
+        <span className="panel-title">Simulation Time Control</span>
         <DownOutlined className="panel-arrow" />
       </div>
 

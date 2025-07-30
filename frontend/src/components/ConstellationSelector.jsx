@@ -28,7 +28,7 @@ const ConstellationSelector = () => {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <GlobalOutlined className="panel-icon" />
-        <span className="panel-title">卫星星座</span>
+        <span className="panel-title">Constellations</span>
         <DownOutlined className="panel-arrow" />
       </div>
 

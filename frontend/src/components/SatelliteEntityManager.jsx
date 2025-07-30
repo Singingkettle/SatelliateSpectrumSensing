@@ -50,7 +50,9 @@ function SatelliteEntityManager() {
         if (!loadedSatellitesRef.current.has(name)) {
           const tleObj = tleList.find(s => s.name === name)
           if (tleObj) {
-            const tle = `${tleObj.name}\n${tleObj.line1}\n${tleObj.line2}`
+            const tle = `${tleObj.name}
+${tleObj.line1}
+${tleObj.line2}`
             manager.addFromTle(tle, [], getColor(constellation))
             loadedSatellitesRef.current.add(name)
           }
