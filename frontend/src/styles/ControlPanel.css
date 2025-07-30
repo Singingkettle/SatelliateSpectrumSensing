@@ -1,0 +1,156 @@
+/*
+ * ControlPanel.css
+ * This file centralizes styles for the left control panel components
+ * to ensure a consistent and high-quality dark theme aesthetic.
+ */
+
+/* Main container for each control panel section */
+.control-panel {
+    padding: 16px 20px;
+    border-bottom: 1px solid #3e3e42;
+    background-color: #2d2d30;
+    /* Slightly lighter than the sider background */
+}
+
+/* Header style for each panel (Icon + Text + Arrow) */
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.panel-header .panel-icon {
+    color: #0095ff;
+    /* A vibrant blue for icons */
+    font-size: 18px;
+}
+
+.panel-header .panel-title {
+    color: #e0e0e0;
+    /* Light grey for readability */
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    flex-grow: 1;
+    /* Pushes the arrow to the right */
+}
+
+.panel-header .panel-arrow {
+    color: #a0a0a0;
+    transition: transform 0.2s ease-in-out;
+}
+
+.panel-header.collapsed .panel-arrow {
+    transform: rotate(-90deg);
+}
+
+/* Frosted glass effect for specific components like Tabs/Tables */
+.frosted-glass {
+    background: rgba(49, 58, 75, 0.4);
+    /* Semi-transparent background */
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Custom styles for Ant Design components inside panels */
+.control-panel .ant-select-selector,
+.control-panel .ant-input-number,
+.control-panel .ant-picker {
+    background-color: #3c3c3c !important;
+    border: 1px solid #5a5a5a !important;
+    color: #e0e0e0 !important;
+}
+
+.control-panel .ant-select-arrow,
+.control-panel .ant-input-number-handler,
+.control-panel .ant-picker-suffix {
+    color: #a0a0a0 !important;
+}
+
+.control-panel .ant-input-number-input {
+    color: #e0e0e0 !important;
+}
+
+/* Style for placeholder text in DatePicker */
+.control-panel .ant-picker-input>input::placeholder {
+    color: #a0a0a0 !important;
+    opacity: 1;
+    /* Override default browser opacity */
+}
+
+/* A more specific selector for the range separator to ensure color override */
+.control-panel .ant-picker-range-separator,
+.control-panel .ant-picker-range-separator .ant-picker-separator {
+    color: #a0a0a0 !important;
+}
+
+.control-panel .ant-typography,
+.control-panel .ant-checkbox-wrapper {
+    color: #cccccc;
+    font-size: 13px;
+}
+
+/* Styling for the satellite selection Tabs */
+.satellite-selection-tabs .ant-tabs-nav {
+    margin-bottom: 12px;
+}
+
+.satellite-selection-tabs .ant-tabs-tab {
+    color: #a0a0a0;
+    font-size: 12px;
+}
+
+.satellite-selection-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #0095ff !important;
+}
+
+.satellite-selection-tabs .ant-tabs-ink-bar {
+    background: #0095ff !important;
+}
+
+/* Styling for the Table within the frosted glass */
+.satellite-selection-tabs .ant-table {
+    background: transparent;
+    /* Make table transparent to show the glass effect */
+}
+
+.satellite-selection-tabs .ant-table-thead>tr>th {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e0e0e0;
+}
+
+.satellite-selection-tabs .ant-table-tbody>tr>td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cccccc;
+}
+
+.satellite-selection-tabs .ant-table-tbody>tr.ant-table-row:hover>td {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.satellite-selection-tabs .ant-table-tbody>tr.ant-table-row-selected>td {
+    background: rgba(0, 149, 255, 0.25) !important;
+    color: #ffffff !important;
+}
+
+/* Custom pagination colors inside the glass */
+.satellite-pagination .ant-pagination-item-link,
+.satellite-pagination .ant-pagination-simple-pager,
+.satellite-pagination .ant-select-selector {
+    background-color: transparent !important;
+    color: #b0b0b0 !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.satellite-pagination .ant-select-arrow {
+    color: #b0b0b0 !important;
+}

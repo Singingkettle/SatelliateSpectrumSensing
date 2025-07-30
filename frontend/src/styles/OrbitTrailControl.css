@@ -1,0 +1,57 @@
+/* OrbitTrailControl.css */
+
+.orbit-control-content {
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.satellite-stats {
+    color: #9cdcfe;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background-color: rgba(156, 220, 254, 0.1);
+    border-radius: 4px;
+}
+
+.control-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #3c3c3c;
+    border: 1px solid #5a5a5a;
+    border-radius: 4px;
+}
+
+.control-label {
+    color: #e0e0e0 !important;
+    font-size: 13px !important;
+    font-weight: 500;
+    display: block;
+}
+
+.control-description {
+    color: #a0a0a0 !important;
+    font-size: 11px !important;
+    opacity: 0.9;
+}
+
+.status-indicator {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: rgba(82, 196, 26, 0.1);
+    border: 1px solid rgba(82, 196, 26, 0.4);
+    border-radius: 4px;
+    text-align: center;
+    color: #52c41a;
+    font-size: 11px;
+}
+
+.ant-switch-checked {
+    background-color: #0095ff !important;
+}

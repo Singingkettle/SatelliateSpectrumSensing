@@ -1,10 +1,13 @@
-import React from 'react';
-import { Checkbox, Spin, Alert, Typography } from 'antd';
+import React, { useState } from 'react';
+import { Checkbox, Spin, Typography } from 'antd';
+import { GlobalOutlined, DownOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useConstellationStore } from '../store/constellationStore';
+import '../styles/ConstellationSelector.css'; // Import custom CSS
 
-const { Title } = Typography;
+const { Text } = Typography;
 
 const ConstellationSelector = () => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const constellations = useConstellationStore((state) => state.constellations);
   const loading = useConstellationStore(
     (state) => state.loading && state.constellations.length === 0
@@ -18,19 +21,55 @@ const ConstellationSelector = () => {
   );
 
   return (
-    <Spin spinning={loading} tip="正在加载星座列表...">
-      <Title level={4}>卫星星座</Title>
-      {error && constellations.length === 0 ? (
-        <Alert message={error} type="error" />
-      ) : (
-        <Checkbox.Group
-          style={{ width: '100%' }}
-          options={constellations}
-          value={selectedConstellations}
-          onChange={setSelectedConstellations}
-        />
+    <div className="control-panel">
+      {/* Panel Header */}
+      <div
+        className={`panel-header ${isCollapsed ? 'collapsed' : ''}`}
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <GlobalOutlined className="panel-icon" />
+        <span className="panel-title">卫星星座</span>
+        <DownOutlined className="panel-arrow" />
+      </div>
+
+      {/* Content Area */}
+      {!isCollapsed && (
+        <Spin spinning={loading} tip={<span style={{ color: '#cccccc' }}>正在加载星座列表...</span>}>
+          {error && constellations.length === 0 ? (
+            <div className="error-box">
+              <ExclamationCircleOutlined className="error-icon" />
+              <Text className="error-text">{error}</Text>
+            </div>
+          ) : (
+            <Checkbox.Group
+              style={{ width: '100%' }}
+              value={selectedConstellations}
+              onChange={setSelectedConstellations}
+            >
+              <div className="constellation-list">
+                {constellations.map((constellation) => (
+                  <div
+                    key={constellation.value}
+                    className={`constellation-item ${selectedConstellations.includes(constellation.value) ? 'selected' : ''}`}
+                  >
+                    <Checkbox value={constellation.value}>
+                      <span className="constellation-label">
+                        {constellation.label}
+                      </span>
+                    </Checkbox>
+                    {constellation.description && (
+                      <div className="constellation-description">
+                        {constellation.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Checkbox.Group>
+          )}
+        </Spin>
       )}
-    </Spin>
+    </div>
   );
 };
 

@@ -25,6 +25,7 @@ class TleService:
         """
         从Redis缓存中获取TLE数据。如果缓存不存在，则触发一次新的下载。
         """
+        constellation_name = constellation_name.lower()
         redis_key = f"tle:{constellation_name}"
         cached_data = self.redis_client.get(redis_key)
         if cached_data:

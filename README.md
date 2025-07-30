@@ -177,3 +177,17 @@ system('python setup.py install')
 - `+network/`: **网络层**。包含链路管理器基类、工厂类和各星座的建链策略实现。
 - `+interface/`: **接口层**。包含供Python调用的顶层API函数。
 - `+utils/`: 通用工具函数。
+
+## 7. 技术文档
+
+为了更好地理解项目的设计和实现细节，请参阅以下文档：
+
+### 系统设计与实现
+- 📖 **[Python后端设计文档 (python_backend_design.md)](doc/python_backend_design.md)**: 详细描述了Python后端的架构设计、API接口和服务模块
+
+### 前端功能指南  
+- 🛰️ **[轨道可视化使用指南 (orbit_visualization_guide.md)](doc/orbit_visualization_guide.md)**: 卫星轨道显示功能的完整使用指南，包括轨道椭圆和运动轨迹的分离控制、性能优化策略等
+- 🔧 **[前端问题修复总结 (frontend_fixes_summary.md)](doc/frontend_fixes_summary.md)**: 前端界面配色、轨道计算逻辑等关键问题的修复记录和技术细节
+
+### 参考资料
+- 📋 **[Satvis轨道计算架构文档 (satvis_orbit_logic.md)](satvis/satvis_orbit_logic.md)**: 参考的satvis项目轨道计算与可视化架构设计文档
