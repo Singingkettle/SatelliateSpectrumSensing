@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Checkbox, Spin, Typography } from 'antd';
 import { GlobalOutlined, DownOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useConstellationStore } from '../store/constellationStore';
 import '../styles/ConstellationSelector.css'; // Import custom CSS
 
 const { Text } = Typography;
 
 const ConstellationSelector = () => {
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const constellations = useConstellationStore((state) => state.constellations);
   const loading = useConstellationStore(
@@ -28,13 +30,13 @@ const ConstellationSelector = () => {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <GlobalOutlined className="panel-icon" />
-        <span className="panel-title">Constellations</span>
+        <span className="panel-title">{t('constellationSelectorTitle')}</span>
         <DownOutlined className="panel-arrow" />
       </div>
 
       {/* Content Area */}
       {!isCollapsed && (
-        <Spin spinning={loading} tip={<span style={{ color: '#cccccc' }}>Loading constellations...</span>}>
+        <Spin spinning={loading} tip={<span style={{ color: '#cccccc' }}>{t('loadingConstellations')}</span>}>
           {error && constellations.length === 0 ? (
             <div className="error-box">
               <ExclamationCircleOutlined className="error-icon" />

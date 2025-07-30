@@ -1,10 +1,11 @@
 import React, { useEffect, Suspense } from 'react';
-import { Layout, Space, Spin } from 'antd';
+import { Layout, Spin } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useConstellationStore } from './store/constellationStore';
 import SimulationTimeController from './components/SimulationTimeController';
 import ConstellationSelector from './components/ConstellationSelector';
 import SatelliteSelectionView from './components/SatelliteSelectionView';
-import OrbitTrailControl from './components/OrbitTrailControl';
+import DisplaySettings from './components/DisplaySettings'; // Corrected import
 import 'antd/dist/reset.css';
 import './styles/ControlPanel.css';
 
@@ -16,13 +17,31 @@ const { Sider, Content } = Layout;
 const SIDER_WIDTH = 380;
 
 function App() {
+  const { i18n } = useTranslation();
   const fetchConstellations = useConstellationStore(
     (state) => state.fetchConstellations
   );
 
   useEffect(() => {
     fetchConstellations();
-  }, [fetchConstellations]);
+
+    // Language detection logic
+    const storedLang = localStorage.getItem('i18nextLng');
+    if (!storedLang) {
+      fetch('https://ip-api.com/json')
+        .then(response => response.json())
+        .then(data => {
+          if (data.countryCode === 'CN') {
+            i18n.changeLanguage('zh');
+          } else {
+            i18n.changeLanguage('en');
+          }
+        })
+        .catch(() => {
+          i18n.changeLanguage('zh'); // Default to Chinese on error
+        });
+    }
+  }, [fetchConstellations, i18n]);
 
   return (
     <Layout style={{ minHeight: '100vh', backgroundColor: '#1e1e1e' }}>
@@ -69,7 +88,7 @@ function App() {
             <SimulationTimeController />
             <ConstellationSelector />
             <SatelliteSelectionView />
-            <OrbitTrailControl />
+            <DisplaySettings />
           </div>
         </Sider>
         <Content style={{ flex: 1, position: 'relative', backgroundColor: '#1e1e1e' }}>

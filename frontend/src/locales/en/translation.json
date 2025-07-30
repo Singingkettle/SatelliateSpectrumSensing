@@ -1,0 +1,23 @@
+{
+  "constellationSelectorTitle": "Constellations",
+  "simulationTimeControlTitle": "Simulation Time Control",
+  "displaySettingsTitle": "Display Settings",
+  "satelliteSelectionTitle": "Satellite Selection",
+  "satelliteNameColumn": "Satellite Name",
+  "loadingConstellations": "Loading constellations...",
+  "loadingTleData": "Loading TLE data...",
+  "startAndEndTime": "Start and End Time",
+  "timeStep": "Time Step (seconds)",
+  "orbitDisplay": "Orbit Display",
+  "orbitDisplayDescriptionOn": "Show complete orbit ellipses for all loaded satellites",
+  "orbitDisplayDescriptionOff": "Hide complete orbit ellipses for all loaded satellites",
+  "loadedSatellites": "Loaded: {{count}} satellites",
+  "orbitDisplayStatusOn": "✓ Orbit display is ON",
+  "orbitDisplayStatusOff": "○ Orbit display is OFF",
+  "affectsSatellites": "(Affects {{count}} satellites)",
+  "language": "Language",
+  "startTime": "Start Time",
+  "endTime": "End Time",
+  "statusOn": "On",
+  "statusOff": "Off"
+}

@@ -1,6 +1,6 @@
-/* OrbitTrailControl.css */
+/* DisplaySettings.css */
 
-.orbit-control-content {
+.display-settings-content {
     padding-top: 16px;
     display: flex;
     flex-direction: column;
@@ -18,7 +18,10 @@
     border-radius: 4px;
 }
 
+
+
 .control-item {
+    flex: 1;
     display: flex;
     justify-content: space-between;
     align-items: center;

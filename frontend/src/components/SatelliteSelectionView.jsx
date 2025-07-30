@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Table, Tabs, Typography, Alert, Spin } from 'antd';
 import { DownOutlined, RocketOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useConstellationStore } from '../store/constellationStore';
 
 const SatelliteSelectionView = () => {
+    const { t } = useTranslation();
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const tleData = useConstellationStore((state) => state.tleData);
@@ -31,7 +33,7 @@ const SatelliteSelectionView = () => {
 
     const columns = (constellationName) => [
         {
-            title: '卫星名称',
+            title: t('satelliteNameColumn'),
             dataIndex: 'name',
             key: 'name',
         },
@@ -80,12 +82,12 @@ const SatelliteSelectionView = () => {
                 onClick={() => setIsCollapsed(!isCollapsed)}
             >
                 <RocketOutlined className="panel-icon" />
-                <span className="panel-title">卫星选择</span>
+                <span className="panel-title">{t('satelliteSelectionTitle')}</span>
                 <DownOutlined className="panel-arrow" />
             </div>
 
             {!isCollapsed && (
-                <Spin spinning={loading} tip="Loading TLE data...">
+                <Spin spinning={loading} tip={t('loadingTleData')}>
                     <div className="frosted-glass">
                         <Tabs
                             defaultActiveKey={selectedConstellations[0]}

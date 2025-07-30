@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Viewer } from 'resium';
 import * as Cesium from 'cesium';
 import SatelliteEntityManager from './SatelliteEntityManager';
+import StatusDisplay from './StatusDisplay'; // Import the new component
 import { useConstellationStore } from '../store/constellationStore';
 
 Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1Y2Q0YTI2OC01MGYzLTRhOGEtYTVkYi04ZWMyZWQzY2YxNjIiLCJpZCI6MTUzMjk0LCJpYXQiOjE2ODkyMTYwOTF9.fMWg2AegsO1Ontmb1YC1fR9g6gSenOv85ILOe1vD5YU';
@@ -102,6 +103,7 @@ const CesiumViewer = () => {
       sceneModePicker={false}
       selectionIndicator={true}
     >
+      <StatusDisplay />
       <SatelliteEntityManager />
     </Viewer>
   );

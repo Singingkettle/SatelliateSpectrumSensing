@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { DatePicker, InputNumber, Typography } from 'antd';
 import { ClockCircleOutlined, DownOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useConstellationStore } from '../store/constellationStore';
 import dayjs from 'dayjs';
 
@@ -8,6 +9,7 @@ const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
 const SimulationTimeController = () => {
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const setSimulationTime = useConstellationStore(
@@ -37,7 +39,7 @@ const SimulationTimeController = () => {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <ClockCircleOutlined className="panel-icon" />
-        <span className="panel-title">Simulation Time Control</span>
+        <span className="panel-title">{t('simulationTimeControlTitle')}</span>
         <DownOutlined className="panel-arrow" />
       </div>
 
@@ -46,21 +48,21 @@ const SimulationTimeController = () => {
           {/* Time Range Selection */}
           <div style={{ marginBottom: '16px' }}>
             <Text style={{ display: 'block', marginBottom: '8px' }}>
-              Start and End Time
+              {t('startAndEndTime')}
             </Text>
             <RangePicker
               showTime
               style={{ width: '100%' }}
               value={datePickerValue}
               onChange={handleTimeChange}
-              placeholder={['Start Time', 'End Time']}
+              placeholder={[t('startTime'), t('endTime')]}
             />
           </div>
 
           {/* Time Step */}
           <div>
             <Text style={{ display: 'block', marginBottom: '8px' }}>
-              Time Step (seconds)
+              {t('timeStep')}
             </Text>
             <InputNumber
               min={0.1}
