@@ -4,13 +4,13 @@ import { useCesium } from 'resium'
 import { useConstellationStore } from '../store/constellationStore'
 import { SatelliteManager } from '../services/OrbitCalculator'
 
-/**
- * 负责把 store 中选中的卫星加载到 Cesium, 并在
- * - 选中卫星列表变化
- * - 轨道显示开关变化
- * - 仿真时间范围变化
- * 时，自动增删 / 刷新卫星组件
- */
+  /**
+   * This component is responsible for loading the selected satellites from the store into Cesium.
+   * It automatically adds/removes/refreshes satellite components when:
+   * - The list of selected satellites changes
+   * - The orbit display switch changes
+   * - The simulation time range changes
+   */
 function SatelliteEntityManager() {
   const { viewer } = useCesium()
   const satelliteManagerRef = useRef(null)
@@ -46,14 +46,16 @@ function SatelliteEntityManager() {
       satNames.forEach(name => {
         currently.add(name)
 
-        // New satellite -> addFromTle (load only, don't show)
+        // New satellite -> addFromTle (load and show)
         if (!loadedSatellitesRef.current.has(name)) {
           const tleObj = tleList.find(s => s.name === name)
           if (tleObj) {
             const tle = `${tleObj.name}
 ${tleObj.line1}
 ${tleObj.line2}`
-            manager.addFromTle(tle, [], getColor(constellation))
+            const componentsToShow = showOrbits ? ['Point', 'Orbit'] : ['Point'];
+            const satellite = manager.addFromTle(tle, [], getColor(constellation))
+            satellite.show(componentsToShow);
             loadedSatellitesRef.current.add(name)
           }
         }
@@ -67,7 +69,7 @@ ${tleObj.line2}`
         loadedSatellitesRef.current.delete(name)
       }
     })
-  }, [selectedSatellites, tleData, getColor])
+  }, [selectedSatellites, tleData, getColor, showOrbits])
 
   /**
    * Uniformly handle the display state of all loaded satellites.
@@ -120,8 +122,12 @@ ${tleObj.line2}`
       loadedSatellitesRef.current.delete(name)
 
       // Re-addFromTle (will resample based on the current Cesium clock's startTime/stopTime)
-      const tle = `${tleObj.name}\n${tleObj.line1}\n${tleObj.line2}`
-      manager.addFromTle(tle, [], getColor(constellationName))
+      const tle = `${tleObj.name}
+${tleObj.line1}
+${tleObj.line2}`
+      const componentsToShow = showOrbits ? ['Point', 'Orbit'] : ['Point'];
+      const satellite = manager.addFromTle(tle, [], getColor(constellationName))
+      satellite.show(componentsToShow);
       loadedSatellitesRef.current.add(name)
     })
   }, [startTime, endTime])
