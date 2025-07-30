@@ -1,68 +1,68 @@
-# 卫星互联网仿真平台 v3.0
+# Satellite Internet Simulation Platform v3.0
 
-## 1. 系统概述
+## 1. System Overview
 
-本项目是一个基于Python和MATLAB的模块化仿真平台，旨在对低地球轨道（LEO）卫星星座（支持Starlink, OneWeb, Iridium）进行高保真的网络层和物理层仿真。平台采用前后端分离架构，后端负责处理仿真逻辑和数据，前端（未来实现）负责可视化展示。
+This project is a modular simulation platform based on Python and MATLAB, designed for high-fidelity network and physical layer simulations of Low Earth Orbit (LEO) satellite constellations (supporting Starlink, OneWeb, Iridium). The platform uses a front-end/back-end separated architecture, where the back-end handles simulation logic and data, and the front-end (to be implemented in the future) is responsible for visualization.
 
-**核心特性**:
-- **前后端分离架构**: Python后端负责逻辑处理，解耦仿真与显示。
-- **混合编程**: 利用Python (Flask) 的Web服务能力和MATLAB强大的科学计算与仿真能力。
-- **无状态仿真引擎**: MATLAB代码被重构为无状态的分析引擎，接收前端发送的场景快照，按需执行计算。
-- **自动化数据管理**: Python后端自动从CelesTrak下载和解析TLE星历数据，并使用Redis进行缓存和每日定时更新。
-- **模块化与可扩展**: 清晰的三层MATLAB架构（物理层、网络层、接口层）和模块化的Python服务，易于维护和扩展。
-- **高保真物理层**: 物理层仿真包含真实的I/Q基带信号生成（OFDM/QPSK）、信道效应（路径损耗、大气、降雨）和接收机噪声模型。
+**Core Features**:
+- **Front-end/Back-end Separation**: Python back-end for logic processing, decoupling simulation from display.
+- **Hybrid Programming**: Leverages the web service capabilities of Python (Flask) and the powerful scientific computing and simulation capabilities of MATLAB.
+- **Stateless Simulation Engine**: MATLAB code is refactored into a stateless analysis engine that receives scene snapshots from the front-end and performs calculations on demand.
+- **Automated Data Management**: The Python back-end automatically downloads and parses TLE ephemeris data from CelesTrak, and uses Redis for caching and daily scheduled updates.
+- **Modularity and Extensibility**: A clear three-layer MATLAB architecture (physical, network, interface) and modular Python services make it easy to maintain and extend.
+- **High-Fidelity Physical Layer**: The physical layer simulation includes realistic I/Q baseband signal generation (OFDM/QPSK), channel effects (path loss, atmosphere, rain), and a receiver noise model.
 
-## 2. 系统架构
+## 2. System Architecture
 
 ```
 ┌────────────────┐      HTTP/WebSocket      ┌──────────────────┐      MATLAB Engine API      ┌──────────────────┐
 │                │ <----------------------> │                  │ -------------------------> │                  │
-│   前端         │                          │   Python 后端    │                            │  MATLAB 仿真引擎 │
-│ (CesiumJS)     │                          │    (Flask)       │                            │ (核心算法)       │
+│   Frontend     │                          │   Python Backend │                            │  MATLAB          │
+│ (CesiumJS)     │                          │    (Flask)       │                            │ (Core Algorithm) │
 │                │ <----------------------> │                  │ <------------------------- │                  │
 └────────────────┘                          └──────────────────┘                            └──────────────────┘
        ▲                                             │                                              │
        │                                             ▼                                              ▼
        │                                     ┌──────────────────┐                             ┌──────────────────┐
-       └─────────────────────────────────────│  Redis 缓存      │                             │  MATLAB代码库    │
-                                             │ (TLE数据, IQ数据)│                             │ (+physical, +network)│
+       └─────────────────────────────────────│  Redis Cache     │                             │  MATLAB Codebase │
+                                             │ (TLE Data, IQ Data)│                             │ (+physical, +network)│
                                              └──────────────────┘                             └──────────────────┘
 ```
 
-## 3. 环境配置与安装
+## 3. Environment Configuration and Installation
 
-### 3.1. 所需软件
+### 3.1. Required Software
 
-1.  **MATLAB**: R2021a 或更高版本。
-    - **必需工具箱**: Communications Toolbox, Signal Processing Toolbox.
-2.  **Python**: 3.8 或更高版本。
-3.  **Redis**: 任意最新稳定版本。可从 [redis.io](https://redis.io/docs/getting-started/installation/) 下载或使用Docker运行。
+1.  **MATLAB**: R2021a or later.
+    - **Required Toolboxes**: Communications Toolbox, Signal Processing Toolbox.
+2.  **Python**: 3.8 or later.
+3.  **Redis**: Any recent stable version. Can be downloaded from [redis.io](https://redis.io/docs/getting-started/installation/) or run using Docker.
 
-### 3.2. 环境安装步骤
+### 3.2. Environment Installation Steps
 
-#### a. 配置MATLAB引擎
+#### a. Configure MATLAB Engine
 
-确保Python可以调用MATLAB。打开MATLAB，在命令窗口中运行：
+Ensure that Python can call MATLAB. Open MATLAB and run the following in the command window:
 
 ```matlab
 cd(fullfile(matlabroot, 'extern', 'engines', 'python'))
 system('python setup.py install')
 ```
-*如果您的系统上有多个Python版本，请确保这里的 `python` 命令指向您为本项目创建的虚拟环境中的Python解释器。*
+*If you have multiple Python versions on your system, make sure the `python` command here points to the Python interpreter in the virtual environment you created for this project.*
 
-#### b. 配置Python后端
+#### b. Configure Python Backend
 
-1.  **导航到后端目录**:
+1.  **Navigate to the backend directory**:
     ```bash
     cd E:\Projects\SatelliateSpectrumSensing\backend\python_backend
     ```
 
-2.  **创建Python虚拟环境**:
+2.  **Create a Python virtual environment**:
     ```bash
     python -m venv env
     ```
 
-3.  **激活虚拟环境**:
+3.  **Activate the virtual environment**:
     ```bash
     # Windows
     .\env\Scripts\activate
@@ -71,41 +71,41 @@ system('python setup.py install')
     # source env/bin/activate
     ```
 
-4.  **安装所有依赖包**:
+4.  **Install all dependencies**:
     ```bash
     pip install Flask Flask-Cors matlabengine APScheduler redis requests sgp4
     ```
 
-#### c. 启动依赖服务
+#### c. Start Dependent Services
 
-- **启动Redis**: 确保您的Redis服务器正在默认端口 `6379` 上运行。
+- **Start Redis**: Ensure your Redis server is running on the default port `6379`.
 
-## 4. 如何运行
+## 4. How to Run
 
-1.  **启动后端服务**:
-    - 确保您的Python虚拟环境已激活。
-    - 导航到 `backend/python_backend` 目录。
-    - 运行以下命令:
+1.  **Start the backend service**:
+    - Make sure your Python virtual environment is activated.
+    - Navigate to the `backend/python_backend` directory.
+    - Run the following command:
       ```bash
       python app.py
       ```
 
-2.  **服务状态**: 
-    - 服务将在 `http://localhost:5002` 上启动。
-    - 您应该会在终端看到日志，包括 “已成功连接到Redis服务器” 和 “后台TLE更新调度器已启动”。
+2.  **Service Status**:
+    - The service will start on `http://localhost:5002`.
+    - You should see logs in the terminal, including "Successfully connected to Redis server" and "Background TLE update scheduler has been started".
 
-3.  **验证服务**: 
-    - 打开浏览器或使用 `curl` 访问健康检查端点 `http://localhost:5002/api/health`。
-    - 您应该会收到 `{"status": "ok", "message": "Backend is running"}` 的响应。
+3.  **Verify the service**:
+    - Open a browser or use `curl` to access the health check endpoint `http://localhost:5002/api/health`.
+    - You should receive a `{"status": "ok", "message": "Backend is running"}` response.
 
-## 5. API接口说明
+## 5. API Interface Description
 
-### 5.1. 获取支持的星座
+### 5.1. Get Supported Constellations
 
 - **URL**: `/api/constellations`
-- **方法**: `GET`
-- **描述**: 返回后端支持的所有星座及其描述。
-- **成功响应 (200 OK)**:
+- **Method**: `GET`
+- **Description**: Returns all constellations supported by the backend and their descriptions.
+- **Success Response (200 OK)**:
   ```json
   [
     {"name": "Starlink", "description": "..."},
@@ -114,25 +114,25 @@ system('python setup.py install')
   ]
   ```
 
-### 5.2. 获取星座TLE数据
+### 5.2. Get Constellation TLE Data
 
 - **URL**: `/api/tle/<constellation_name>`
-- **方法**: `GET`
-- **示例**: `/api/tle/starlink`
-- **描述**: 从Redis缓存中获取指定星座的TLE数据。如果缓存不存在，会自动从CelesTrak下载。
-- **成功响应 (200 OK)**:
+- **Method**: `GET`
+- **Example**: `/api/tle/starlink`
+- **Description**: Gets the TLE data for the specified constellation from the Redis cache. If the cache does not exist, it is automatically downloaded from CelesTrak.
+- **Success Response (200 OK)**:
   ```json
   [
     {"name": "STARLINK-1007", "line1": "...", "line2": "..."}
   ]
   ```
 
-### 5.3. 执行仿真快照分析
+### 5.3. Execute Simulation Snapshot Analysis
 
 - **URL**: `/api/simulation/start`
-- **方法**: `POST`
-- **描述**: 接收一个包含场景物理状态的快照，执行“网络层建链 -> 物理层分析”的完整流程，并将生成的IQ数据存入Redis。
-- **请求体 (Body)**: (详细结构请参考 `backend/python_backend/test_payload_hierarchical.json`)
+- **Method**: `POST`
+- **Description**: Receives a snapshot containing the physical state of the scene, executes the full "network layer link establishment -> physical layer analysis" process, and stores the generated IQ data in Redis.
+- **Request Body**: (For detailed structure, please refer to `backend/python_backend/test_payload_hierarchical.json`)
   ```json
   {
     "timestamp": "2025-07-16T10:00:00Z",
@@ -147,13 +147,13 @@ system('python setup.py install')
     ]
   }
   ```
-- **成功响应 (200 OK)**:
+- **Success Response (200 OK)**:
   ```json
   {
     "status": "success",
     "results": {
       "status": "success",
-      "message": "多星座仿真成功完成",
+      "message": "Multi-constellation simulation completed successfully",
       "links": [
         {
           "satellite_name": "...",
@@ -169,25 +169,25 @@ system('python setup.py install')
   }
   ```
 
-## 6. MATLAB代码库结构
+## 6. MATLAB Codebase Structure
 
-重构后的MATLAB代码位于 `backend/matlab/`，遵循清晰的三层架构：
+The refactored MATLAB code is located in `backend/matlab/` and follows a clear three-layer architecture:
 
-- `+physical/`: **物理层**。包含核心信道模型和各星座的物理参数、信号生成、链路预算等。
-- `+network/`: **网络层**。包含链路管理器基类、工厂类和各星座的建链策略实现。
-- `+interface/`: **接口层**。包含供Python调用的顶层API函数。
-- `+utils/`: 通用工具函数。
+- `+physical/`: **Physical Layer**. Contains the core channel model and physical parameters, signal generation, link budget, etc. for each constellation.
+- `+network/`: **Network Layer**. Contains the link manager base class, factory class, and link establishment strategy implementations for each constellation.
+- `+interface/`: **Interface Layer**. Contains the top-level API functions for Python to call.
+- `+utils/`: General utility functions.
 
-## 7. 技术文档
+## 7. Technical Documentation
 
-为了更好地理解项目的设计和实现细节，请参阅以下文档：
+To better understand the design and implementation details of the project, please refer to the following documents:
 
-### 系统设计与实现
-- 📖 **[Python后端设计文档 (python_backend_design.md)](doc/python_backend_design.md)**: 详细描述了Python后端的架构设计、API接口和服务模块
+### System Design and Implementation
+- 📖 **[Python Backend Design Document (python_backend_design.md)](doc/python_backend_design.md)**: Describes the architectural design, API interfaces, and service modules of the Python backend in detail.
 
-### 前端功能指南  
-- 🛰️ **[轨道可视化使用指南 (orbit_visualization_guide.md)](doc/orbit_visualization_guide.md)**: 卫星轨道显示功能的完整使用指南，包括轨道椭圆和运动轨迹的分离控制、性能优化策略等
-- 🔧 **[前端问题修复总结 (frontend_fixes_summary.md)](doc/frontend_fixes_summary.md)**: 前端界面配色、轨道计算逻辑等关键问题的修复记录和技术细节
+### Frontend Feature Guides
+- 🛰️ **[Orbit Visualization User Guide (orbit_visualization_guide.md)](doc/orbit_visualization_guide.md)**: A complete user guide for the satellite orbit display function, including separate control of the orbit ellipse and motion trail, performance optimization strategies, etc.
+- 🔧 **[Frontend Issue Fixes Summary (frontend_fixes_summary.md)](doc/frontend_fixes_summary.md)**: A record of fixes and technical details for key issues such as the frontend interface color scheme and orbit calculation logic.
 
-### 参考资料
-- 📋 **[Satvis轨道计算架构文档 (satvis_orbit_logic.md)](satvis/satvis_orbit_logic.md)**: 参考的satvis项目轨道计算与可视化架构设计文档
+### References
+- 📋 **[Satvis Orbit Calculation Architecture Document (satvis_orbit_logic.md)](satvis/satvis_orbit_logic.md)**: The referenced satvis project orbit calculation and visualization architecture design document.
