@@ -1,0 +1,6 @@
+feat: Implement collapsible control panel
+
+- Add a collapsible control panel on the left side of the screen.
+- The panel expands on mouse hover and can be pinned to stay open.
+- The status display component adjusts its position based on the panel's state.
+- A new uiStore is created to manage the panel's state.
