@@ -5,70 +5,70 @@ import os
 
 class MatlabEngineService:
     """
-    封装与MATLAB引擎交互的服务。
+    A service that encapsulates interaction with the MATLAB engine.
 
-    管理引擎的生命周期，包括启动、查找共享会话和关闭。
-    提供执行MATLAB函数和脚本的统一接口。
+    Manages the lifecycle of the engine, including starting, finding shared sessions, and shutting down.
+    Provides a unified interface for executing MATLAB functions and scripts.
     """
     def __init__(self):
         self.eng = None
 
     def start_engine(self):
         """
-        启动或连接到一个共享的MATLAB引擎会话。
+        Starts or connects to a shared MATLAB engine session.
 
-        首先尝试查找现有的共享会话，如果找不到，则启动一个新的异步引擎实例。
-        这种方式可以提高效率，避免重复启动MATLAB。
+        First, it tries to find existing shared sessions. If none are found, it starts a new asynchronous engine instance.
+        This approach improves efficiency by avoiding repeated MATLAB startups.
         """
         try:
-            # 查找现有的共享MATLAB会话
+            # Find existing shared MATLAB sessions
             existing_sessions = matlab.engine.find_matlab()
             if existing_sessions:
-                print(f"找到 {len(existing_sessions)} 个已存在的MATLAB会话，将连接到第一个。")
+                print(f"Found {len(existing_sessions)} existing MATLAB sessions, connecting to the first one.")
                 self.eng = matlab.engine.connect_matlab(existing_sessions[0])
             else:
-                print("未找到共享的MATLAB会話，正在启动新引擎...")
+                print("No shared MATLAB session found, starting a new engine...")
                 self.eng = matlab.engine.start_matlab("-nodesktop -nosplash")
-            print("MATLAB引擎已成功连接。")
+            print("MATLAB engine connected successfully.")
             return self.eng
         except Exception as e:
-            print(f"启动或连接MATLAB引擎时发生错误: {e}")
+            print(f"An error occurred while starting or connecting to the MATLAB engine: {e}")
             raise
 
     def stop_engine(self):
         """
-        关闭MATLAB引擎会话。
+        Shuts down the MATLAB engine session.
         """
         if self.eng:
-            print("正在关闭MATLAB引擎...")
+            print("Shutting down MATLAB engine...")
             self.eng.quit()
             self.eng = None
-            print("MATLAB引擎已关闭。")
+            print("MATLAB engine has been shut down.")
 
     def run_matlab_function(self, function_name, *args, **kwargs):
         """
-        执行一个MATLAB函数。
+        Executes a MATLAB function.
 
-        参数:
-            function_name (str): 要执行的MATLAB函数的名称。
-            *args: 传递给MATLAB函数的位置参数。
-            **kwargs: 传递给MATLAB函数的命名参数。
+        Args:
+            function_name (str): The name of the MATLAB function to execute.
+            *args: Positional arguments to pass to the MATLAB function.
+            **kwargs: Named arguments to pass to the MATLAB function.
 
-        返回:
-            MATLAB函数的执行结果。
+        Returns:
+            The execution result of the MATLAB function.
         """
         if not self.eng:
             self.start_engine()
         
         try:
-            # 获取MATLAB函数句柄
+            # Get the MATLAB function handle
             matlab_func = getattr(self.eng, function_name)
-            # 调用函数并返回结果
+            # Call the function and return the result
             result = matlab_func(*args, **kwargs)
             return result
         except Exception as e:
-            print(f"执行MATLAB函数 '{function_name}' 时出错: {e}")
+            print(f"An error occurred while executing MATLAB function '{function_name}': {e}")
             raise
 
-# 创建一个单例服务实例，以便在整个应用中共享
+# Create a singleton service instance to be shared across the application
 matlab_service = MatlabEngineService()

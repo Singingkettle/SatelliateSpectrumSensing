@@ -16,7 +16,7 @@ function SatelliteEntityManager() {
   const satelliteManagerRef = useRef(null)
   const loadedSatellitesRef = useRef(new Set())
 
-  // === 从 store 取数据 ===
+  // === Get data from store ===
   const tleData = useConstellationStore(s => s.tleData)
   const selectedSatellites = useConstellationStore(s => s.selectedSatellites)
   const getColor = useConstellationStore(s => s.getConstellationColor)
@@ -24,7 +24,7 @@ function SatelliteEntityManager() {
   const startTime = useConstellationStore(s => s.startTime)
   const endTime = useConstellationStore(s => s.endTime)
 
-  // === 初始化 SatelliteManager ===
+  // === Initialize SatelliteManager ===
   useEffect(() => {
     if (!viewer) return
     satelliteManagerRef.current = new SatelliteManager(viewer)
@@ -32,8 +32,8 @@ function SatelliteEntityManager() {
   }, [viewer])
 
   /**
-   * 处理「卫星选择」变化
-   * 只负责卫星的加载和移除，不处理显示状态
+   * Handle changes in satellite selection.
+   * This only handles loading and unloading of satellites, not their display state.
    */
   useEffect(() => {
     if (!satelliteManagerRef.current) return
@@ -46,7 +46,7 @@ function SatelliteEntityManager() {
       satNames.forEach(name => {
         currently.add(name)
 
-        // 新卫星 ➜ addFromTle (只加载，不显示)
+        // New satellite -> addFromTle (load only, don't show)
         if (!loadedSatellitesRef.current.has(name)) {
           const tleObj = tleList.find(s => s.name === name)
           if (tleObj) {
@@ -58,7 +58,7 @@ function SatelliteEntityManager() {
       })
     })
 
-    // 把已加载但不再选中的卫星移除
+    // Remove satellites that are loaded but no longer selected
     loadedSatellitesRef.current.forEach(name => {
       if (!currently.has(name)) {
         manager.hideSatellite(name)
@@ -68,21 +68,21 @@ function SatelliteEntityManager() {
   }, [selectedSatellites, tleData, getColor])
 
   /**
-   * 统一处理所有已加载卫星的显示状态
-   * 当轨道显示开关变化或卫星选择变化时，统一应用显示状态
+   * Uniformly handle the display state of all loaded satellites.
+   * When the orbit display switch or satellite selection changes, apply the display state uniformly.
    */
   useEffect(() => {
     if (!satelliteManagerRef.current) return
 
     const manager = satelliteManagerRef.current
 
-    // 对所有已加载的卫星应用显示状态
+    // Apply display state to all loaded satellites
     loadedSatellitesRef.current.forEach(name => {
-      // 检查该卫星是否仍然被选中
+      // Check if this satellite is still selected
       const isSelected = Object.values(selectedSatellites).some(satNames => satNames.includes(name))
 
       if (isSelected) {
-        // 根据轨道显示开关决定显示哪些组件
+        // Decide which components to show based on the orbit display switch
         if (showOrbits) {
           manager.showSatellite(name, ['Point', 'Orbit'])
         } else {
@@ -93,38 +93,38 @@ function SatelliteEntityManager() {
   }, [showOrbits, selectedSatellites, startTime, endTime])
 
   /**
-   * 关键修复：
-   * 当 startTime / endTime 变化 (用户修改时间范围) 时，
-   * 需要让每颗已加载卫星重新刷新轨道数据
-   * 只负责重建数据，不处理显示状态（由统一显示管理处理）
+   * Key fix:
+   * When startTime / endTime changes (user modifies the time range),
+   * each loaded satellite needs to refresh its orbit data.
+   * This only handles data reconstruction, not the display state (which is handled by the unified display management).
    */
   useEffect(() => {
     if (!satelliteManagerRef.current) return
 
     const manager = satelliteManagerRef.current
 
-    // 对于已加载卫星，彻底移除并依据新的时间区间重新创建
+    // For loaded satellites, completely remove and recreate them based on the new time interval
     const toRecreate = Array.from(loadedSatellitesRef.current)
     toRecreate.forEach(name => {
-      // 找到所属星座以便获取颜色和 TLE
+      // Find the constellation to get color and TLE
       const constellationEntry = Object.entries(tleData).find(([, list]) => list.some(s => s.name === name))
       if (!constellationEntry) return
       const [constellationName, tleList] = constellationEntry
       const tleObj = tleList.find(t => t.name === name)
       if (!tleObj) return
 
-      // 先彻底删除旧卫星实体
+      // First, completely delete the old satellite entity
       manager.hideSatellite(name)
       loadedSatellitesRef.current.delete(name)
 
-      // 重新 addFromTle（会根据当前 Cesium clock 的 startTime/stopTime 重新采样）
+      // Re-addFromTle (will resample based on the current Cesium clock's startTime/stopTime)
       const tle = `${tleObj.name}\n${tleObj.line1}\n${tleObj.line2}`
       manager.addFromTle(tle, [], getColor(constellationName))
       loadedSatellitesRef.current.add(name)
     })
   }, [startTime, endTime])
 
-  return null          // 组件不渲染任何 JSX
+  return null          // Component does not render any JSX
 }
 
 export default SatelliteEntityManager

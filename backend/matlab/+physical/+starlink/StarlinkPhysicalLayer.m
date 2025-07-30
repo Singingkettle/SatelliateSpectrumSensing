@@ -1,8 +1,8 @@
 classdef StarlinkPhysicalLayer < handle
-    % STARLINKPHYSICALLAYER Starlink星座的物理层实现
-    % 负责管理Starlink特有的物理层参数，并进行链路预算和信噪比(SNR)等计算。
+    % STARLINKPHYSICALLAYER Physical layer implementation for the Starlink constellation.
+    % Responsible for managing Starlink-specific physical layer parameters, and performing calculations for link budget, SNR, etc.
     %
-    % 参考文献:
+    % References:
     % [1] Humphreys, T. E., et al. "Signal Structure of the Starlink Ku-Band
     %     Downlink." ION GNSS+ 2023.
     % [2] FCC Application: SpaceX Non-Geostationary Satellite System, 2016-2018
@@ -32,14 +32,14 @@ classdef StarlinkPhysicalLayer < handle
                     obj.coding_scheme = 'LDPC_3/4';
                     obj.satellite_eirp_dbw = 45.0;
                     obj.terminal_g_t_dbk = 14.5;
-                otherwise , error('不支持的Starlink外壳: %s', shell_name);
+                otherwise , error('Unsupported Starlink shell: %s', shell_name);
             end
 
             obj.channel_modeler = physical.core.ChannelModeler(obj.carrier_frequency_ghz, 45);
         end
 
         function iq_data = generate_iq_signal(obj, direction, duration_sec, sample_rate_hz)
-            % 参考文献:
+            % References:
             % [1] Proakis, J. G., & Salehi, M. (2008). Digital Communications.
             % [2] Humphreys, T. E., et al. "Signal Structure of the Starlink Ku-Band Downlink." ION GNSS+ 2023.
             % [3] FCC Application SAT-LOA-20161115-00118
@@ -53,10 +53,10 @@ classdef StarlinkPhysicalLayer < handle
                                             'CyclicPrefixLength', 64, ...
                                             'NumSymbols', ceil(num_samples / (1024+64)));
                 
-                % 使用info()方法获取调制器信息，以兼容不同MATLAB版本
+                % Use the info() method to get modulator information for compatibility with different MATLAB versions
                 mod_info = info(ofdm_mod);
 
-                % Starlink使用自适应调制，这里以16-QAM为例
+                % Starlink uses adaptive modulation, here we use 16-QAM as an example
                 data_in = randi([0 15], mod_info.DataInputSize(1), ofdm_mod.NumSymbols);
                 symbols_in = qammod(data_in, 16, 'UnitAveragePower', true);
                 iq_data = ofdm_mod(symbols_in);
@@ -68,14 +68,14 @@ classdef StarlinkPhysicalLayer < handle
                 rrc_filter = rcosdesign(0.25, 8, sps, 'sqrt');
                 iq_data = upfirdn(symbols_in, rrc_filter, sps);
             else 
-                error('无效的方向: %s. 请使用 ''uplink'' 或 ''downlink''。', direction);
+                error('Invalid direction: %s. Please use ''uplink'' or ''downlink''.', direction);
             end
 
             iq_data = iq_data(1:num_samples);
         end
 
         function rx_signal = apply_rx_effects(obj, signal, snr_db)
-            % 参考文献:
+            % References:
             % [1] Goldsmith, A. (2005). Wireless Communications.
             rx_signal = awgn(signal, snr_db, 'measured');
         end

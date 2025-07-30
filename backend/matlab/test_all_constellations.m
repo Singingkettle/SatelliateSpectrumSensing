@@ -1,16 +1,16 @@
-% TEST_ALL_CONSTELLATIONS - 测试所有星座的统一仿真流程
+% TEST_ALL_CONSTELLATIONS - Test script for the unified simulation process of all constellations.
 
 function test_all_constellations()
-    fprintf('--- 开始执行所有星座的统一仿真测试脚本 ---\n');
+    fprintf('--- Starting the unified simulation test script for all constellations ---\n');
 
-    % 1. 添加路径
+    % 1. Add paths
     addpath(genpath(fullfile(pwd, '..', 'matlab')));
 
-    % 2. 定义顶层参数
+    % 2. Define top-level parameters
     params.timestamp = '2025-07-16T10:00:00Z';
     params.samplingPeriod = 0.001; % 1ms
     
-    % --- 3. 定义所有星座及其资源 ---
+    % --- 3. Define all constellations and their resources ---
     starlink_cfg.name = 'Starlink';
     starlink_cfg.shell = 'Shell1';
     starlink_cfg.satellites = { struct('name', 'Starlink_1', 'latitude', 53.0, 'longitude', 13.0, 'altitude', 551) };
@@ -26,17 +26,17 @@ function test_all_constellations()
 
     params.constellations = {starlink_cfg, oneweb_cfg, iridium_cfg};
 
-    % 4. 调用统一仿真接口
+    % 4. Call the unified simulation interface
     results = interface.api.run_simulation_snapshot(params);
 
-    % 5. 显示结果
-    fprintf('\n--- 测试结果 ---\n');
+    % 5. Display the results
+    fprintf('\n--- Test Results ---\n');
     disp(results);
 
     if strcmp(results.status, 'success')
-        fprintf('\n[SUCCESS] 测试成功！\n');
+        fprintf('\n[SUCCESS] Test completed successfully!\n');
         if isfield(results, 'links') && ~isempty(results.links)
-            fprintf('共找到并分析了 %d 个链路。\n', length(results.links));
+            fprintf('Found and analyzed a total of %d links.\n', length(results.links));
             disp(results.links);
         end
     end

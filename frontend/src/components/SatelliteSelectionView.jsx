@@ -85,7 +85,7 @@ const SatelliteSelectionView = () => {
             </div>
 
             {!isCollapsed && (
-                <Spin spinning={loading} tip="正在加载TLE数据...">
+                <Spin spinning={loading} tip="Loading TLE data...">
                     <div className="frosted-glass">
                         <Tabs
                             defaultActiveKey={selectedConstellations[0]}

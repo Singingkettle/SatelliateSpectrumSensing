@@ -46,4 +46,4 @@ def get_tle_route(constellation_name: str):
     except ValueError as e:
         return jsonify({"status": "error", "message": str(e)}), 404
     except Exception as e:
-        return jsonify({"status": "error", "message": f"获取TLE数据时发生内部错误: {e}"}), 500
+        return jsonify({"status": "error", "message": f"An internal error occurred while fetching TLE data: {e}"}), 500

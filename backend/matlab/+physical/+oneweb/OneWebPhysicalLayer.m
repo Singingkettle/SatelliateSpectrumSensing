@@ -1,12 +1,12 @@
 classdef OneWebPhysicalLayer < handle
-    % ONEWEBPHYSICALLAYER OneWeb星座的物理层实现
-    % 负责管理OneWeb特有的物理层参数（Ka波段）和相关计算。
+    % ONEWEBPHYSICALLAYER Physical layer implementation for the OneWeb constellation.
+    % Responsible for managing OneWeb-specific physical layer parameters (Ka-band) and related calculations.
     %
-    % 参考文献:
+    % References:
     % [1] OneWeb System Overview - ITU Filing RR Section 9.11A.
-    %     - 提供了系统概览，包括频段和轨道参数。
+    %     - Provides a system overview, including frequency bands and orbital parameters.
     % [2] OneWeb FCC Form 312 Application - File No. SAT-LOI-20160428-00041.
-    %     - 详细描述了技术特性，包括调制和编码方案。
+    %     - Describes technical characteristics in detail, including modulation and coding schemes.
 
     properties (Access = public)
         orbital_altitude_km, carrier_frequency_ghz, bandwidth_mhz, 
@@ -19,27 +19,27 @@ classdef OneWebPhysicalLayer < handle
         end
 
         function initialize_parameters(obj)
-            % 初始化OneWeb特定参数 (参考 [1], [2])
+            % Initializes OneWeb-specific parameters (References [1], [2])
             obj.orbital_altitude_km = 1200;
-            obj.carrier_frequency_ghz = 19.7; % Ka波段下行链路中心频率
+            obj.carrier_frequency_ghz = 19.7; % Ka-band downlink center frequency
             obj.bandwidth_mhz = 125;
             obj.modulation_scheme = '16QAM';
             obj.coding_scheme = 'LDPC_2/3';
-            obj.satellite_eirp_dbw = 48.0; % 估算值
-            obj.terminal_g_t_dbk = 15.0; % 高性能终端G/T值
+            obj.satellite_eirp_dbw = 48.0; % Estimated value
+            obj.terminal_g_t_dbk = 15.0; % G/T value for high-performance terminals
             obj.channel_modeler = physical.core.ChannelModeler(obj.carrier_frequency_ghz, 45);
         end
 
         function iq_data = generate_iq_signal(obj, ~, duration_sec, sample_rate_hz)
-            % 生成16-QAM信号 (使用现代的System Object)
-            sps = 4; % 每个符号的采样数
+            % Generates a 16-QAM signal (using modern System Objects)
+            sps = 4; % Samples per symbol
             num_samples_to_keep = round(duration_sec * sample_rate_hz);
             num_symbols = ceil(num_samples_to_keep / sps);
 
             data_in = randi([0 15], num_symbols, 1);
             symbols_in = qammod(data_in, 16, 'UnitAveragePower', true);
 
-            % 使用RaisedCosineTransmitFilter进行脉冲成形
+            % Use RaisedCosineTransmitFilter for pulse shaping
             tx_filter = comm.RaisedCosineTransmitFilter(...
                 'Shape', 'Square root', ...
                 'RolloffFactor', 0.3, ...
@@ -48,7 +48,7 @@ classdef OneWebPhysicalLayer < handle
 
             iq_data = tx_filter(symbols_in);
 
-            % 裁剪或填充到精确的样本数
+            % Trim or pad to the exact number of samples
             if length(iq_data) >= num_samples_to_keep
                 iq_data = iq_data(1:num_samples_to_keep);
             else

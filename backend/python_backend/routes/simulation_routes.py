@@ -8,7 +8,7 @@ simulation_bp = Blueprint('simulation_bp', __name__)
 @simulation_bp.route('/api/simulation/start', methods=['POST'])
 def start_simulation_route():
     """
-    启动一个新的仿真任务。
+    Starts a new simulation task.
     ---
     tags:
       - Simulation
@@ -25,7 +25,7 @@ def start_simulation_route():
               example: "2025-07-15T23:00:00Z"
             samplingPeriod:
               type: number
-              description: "前端仿真的采样周期 (秒)"
+              description: "Sampling period of the frontend simulation (seconds)"
               example: 0.001
             constellations:
               type: array
@@ -57,17 +57,17 @@ def start_simulation_route():
                         longitude: { type: number }
     responses:
       200:
-        description: 仿真成功启动并返回结果
+        description: Simulation started successfully and results are returned
       400:
-        description: 请求体无效
+        description: Invalid request body
       500:
-        description: 仿真过程中发生错误
+        description: An error occurred during the simulation
     """
     config = request.get_json()
     if not config:
-        return jsonify({"status": "error", "message": "无效的请求体。"}), 400
+        return jsonify({"status": "error", "message": "Invalid request body."}), 400
 
-    # 在这里可以添加更详细的参数验证
+    # More detailed parameter validation can be added here
 
     try:
         results = simulation_service.start_simulation(config)

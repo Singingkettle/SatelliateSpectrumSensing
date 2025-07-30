@@ -34,7 +34,7 @@ const ConstellationSelector = () => {
 
       {/* Content Area */}
       {!isCollapsed && (
-        <Spin spinning={loading} tip={<span style={{ color: '#cccccc' }}>正在加载星座列表...</span>}>
+        <Spin spinning={loading} tip={<span style={{ color: '#cccccc' }}>Loading constellations...</span>}>
           {error && constellations.length === 0 ? (
             <div className="error-box">
               <ExclamationCircleOutlined className="error-icon" />

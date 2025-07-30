@@ -1,8 +1,8 @@
 classdef IridiumPhysicalLayer < handle
-    % IRIDIUMPHYSICALLAYER Iridium星座的物理层实现
-    % 负责管理Iridium特有的物理层参数（L波段）和相关计算。
+    % IRIDIUMPHYSICALLAYER Physical layer implementation for the Iridium constellation.
+    % Responsible for managing Iridium-specific physical layer parameters (L-band) and related calculations.
     %
-    % 参考文献:
+    % References:
     % [1] "Iridium System Engineering Overview" - Motorola Technical Report.
     % [2] "Iridium NEXT System Overview" - IEEE Aerospace Conference 2012.
 
@@ -17,27 +17,27 @@ classdef IridiumPhysicalLayer < handle
         end
 
         function initialize_parameters(obj)
-            % 初始化Iridium特定参数 (参考 [1], [2])
+            % Initializes Iridium-specific parameters (References [1], [2])
             obj.orbital_altitude_km = 780;
-            obj.carrier_frequency_ghz = 1.62; % L波段
+            obj.carrier_frequency_ghz = 1.62; % L-band
             obj.bandwidth_mhz = 0.0315; % 31.5 kHz
             obj.modulation_scheme = 'QPSK';
             obj.coding_scheme = 'BCH';
-            obj.satellite_eirp_dbw = 16.0; % 估算值
-            obj.terminal_g_t_dbk = -15.0; % 手持终端G/T值
+            obj.satellite_eirp_dbw = 16.0; % Estimated value
+            obj.terminal_g_t_dbk = -15.0; % G/T value for handheld terminals
             obj.channel_modeler = physical.core.ChannelModeler(obj.carrier_frequency_ghz, 45);
         end
 
         function iq_data = generate_iq_signal(obj, ~, duration_sec, sample_rate_hz)
-            % 生成QPSK信号 (使用现代的System Object)
-            sps = 4; % 每个符号的采样数
+            % Generates a QPSK signal (using modern System Objects)
+            sps = 4; % Samples per symbol
             num_samples_to_keep = round(duration_sec * sample_rate_hz);
             num_symbols = ceil(num_samples_to_keep / sps);
             
             data_in = randi([0 3], num_symbols, 1);
             symbols_in = pskmod(data_in, 4, pi/4, 'gray');
             
-            % 使用RaisedCosineTransmitFilter进行脉冲成形，更健壮
+            % Use RaisedCosineTransmitFilter for pulse shaping, which is more robust
             tx_filter = comm.RaisedCosineTransmitFilter(...
                 'Shape', 'Square root', ...
                 'RolloffFactor', 0.4, ...
@@ -46,7 +46,7 @@ classdef IridiumPhysicalLayer < handle
                 
             iq_data = tx_filter(symbols_in);
             
-            % 裁剪或填充到精确的样本数
+            % Trim or pad to the exact number of samples
             if length(iq_data) >= num_samples_to_keep
                 iq_data = iq_data(1:num_samples_to_keep);
             else
@@ -63,7 +63,7 @@ classdef IridiumPhysicalLayer < handle
             obj.channel_modeler.frequency_ghz = obj.carrier_frequency_ghz;
             path_loss_db = obj.channel_modeler.calculate_free_space_path_loss(distance_km);
             atmospheric_loss_db = obj.channel_modeler.calculate_atmospheric_loss();
-            rain_loss_db = 0; % L波段降雨衰减可忽略不计
+            rain_loss_db = 0; % Rain attenuation is negligible in the L-band
             total_loss_db = path_loss_db + atmospheric_loss_db + rain_loss_db;
             rx_power_dbw = obj.satellite_eirp_dbw - total_loss_db;
             k_boltzmann = -228.6;

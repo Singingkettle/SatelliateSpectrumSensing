@@ -5,23 +5,23 @@ from .tle_service import tle_service
 
 def update_all_tle_data_job():
     """
-    这是一个后台作业，用于更新所有支持星座的TLE数据。
+    This is a background job to update TLE data for all supported constellations.
     """
-    print("--- [后台任务]: 开始执行每日TLE数据更新 --- ")
+    print("--- [Background Job]: Starting daily TLE data update ---")
     constellations_to_update = ['starlink', 'oneweb', 'iridium']
     for name in constellations_to_update:
         try:
             tle_service.update_tle_data(name)
         except Exception as e:
-            print(f"[后台任务] 更新 {name} TLE数据时发生错误: {e}")
-    print("--- [后台任务]: 每日TLE数据更新完成 --- ")
+            print(f"[Background Job] An error occurred while updating {name} TLE data: {e}")
+    print("--- [Background Job]: Daily TLE data update finished ---")
 
 def initialize_scheduler():
     """
-    初始化并启动后台调度器。
+    Initializes and starts the background scheduler.
     """
     scheduler = BackgroundScheduler(daemon=True)
-    # 添加作业，设置为每天在国际标准时间(UTC)的 01:00 执行
+    # Add the job, set to run daily at 01:00 UTC
     scheduler.add_job(update_all_tle_data_job, 'cron', hour=1, minute=0, timezone='utc')
     scheduler.start()
-    print("后台TLE更新调度器已启动，任务将在每日 01:00 UTC 执行。")
+    print("Background TLE update scheduler has been started, the job will run daily at 01:00 UTC.")

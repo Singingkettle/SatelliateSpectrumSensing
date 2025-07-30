@@ -1,50 +1,50 @@
 classdef LinkManagerBase < handle
-    % LINKMANAGERBASE 星地建链管理器基类
-    % 定义星地建链仿真的通用接口和基础功能。
-    % 所有星座特定的建链规则都通过继承此基类来实现。
+    % LINKMANAGERBASE Base class for satellite-ground link establishment managers.
+    % Defines the common interface and basic functionalities for link establishment simulations.
+    % All constellation-specific link establishment rules are implemented by inheriting from this base class.
     %
-    % 参考文献:
+    % References:
     % [1] "Satellite Communications" by Timothy Pratt, Charles W. Bostian, Jeremy E. Allnutt.
-    %     - 提供了链路建立和切换的基础理论。
+    %     - Provides the fundamental theory of link establishment and handover.
     % [2] "LEO Satellite Communication Networks" by Riccardo de Gaudenzi, et al.
-    %     - 讨论了不同LEO星座的网络拓扑和路由挑战。
+    %     - Discusses the network topology and routing challenges of different LEO constellations.
 
     properties (Access = protected)
-        active_links      % 当前活跃的链路列表
-        link_history      % 历史链路记录
+        active_links      % List of currently active links
+        link_history      % Historical record of links
     end
 
     properties (Access = public)
-        constellation_name    % 星座名称
-        min_elevation_deg     % 最小仰角 (度)
-        max_range_km          % 最大通信距离 (km)
+        constellation_name    % Constellation name
+        min_elevation_deg     % Minimum elevation angle (degrees)
+        max_range_km          % Maximum communication distance (km)
     end
 
     methods
         function obj = LinkManagerBase(constellation_name)
-            % 构造函数
-            % 输入:
-            %   constellation_name (char): 星座名称
+            % Constructor
+            % Input:
+            %   constellation_name (char): The name of the constellation
             obj.constellation_name = constellation_name;
             obj.active_links = {};
             obj.link_history = {};
             
-            % 设置通用默认值，子类可以覆盖这些值
+            % Set common default values, which can be overridden by subclasses
             obj.min_elevation_deg = 10;
             obj.max_range_km = 2500;
         end
 
         function active_links = get_links_for_snapshot(obj, snapshot)
-            % 根据场景快照计算并返回当前时刻的活跃链路
-            % 这是供外部调用的、无状态的主要接口方法
-            % 输入:
-            %   snapshot (struct): 包含当前时刻所有对象状态的结构体
+            % Calculates and returns the active links for the current moment based on a scene snapshot.
+            % This is the main stateless interface method for external calls.
+            % Input:
+            %   snapshot (struct): A structure containing the state of all objects at the current moment.
             %     - satellites (cell): {struct('name', 'id', 'latitude', lat, 'longitude', lon, 'altitude', alt)}
             %     - ground_stations (cell): {struct('name', 'id', 'latitude', lat, 'longitude', lon)}
-            % 输出:
-            %   active_links (cell): 计算出的活跃链路列表
+            % Output:
+            %   active_links (cell): A list of the calculated active links.
 
-            % 过滤出属于本星座的卫星
+            % Filter out the satellites belonging to this constellation
             constellation_sats = obj.filter_constellation_satellites(snapshot.satellites);
 
             if isempty(constellation_sats)
@@ -53,11 +53,11 @@ classdef LinkManagerBase < handle
             end
 
             active_links = {};
-            % 为每个地面终端寻找最佳连接
+            % Find the best connection for each ground terminal
             for i = 1:length(snapshot.ground_stations)
                 gs_data = snapshot.ground_stations{i};
 
-                % 调用由子类实现的 specific select_best_satellite 方法
+                % Call the specific select_best_satellite method implemented by the subclass
                 best_satellite_data = obj.select_best_satellite(gs_data, constellation_sats);
 
                 if ~isempty(best_satellite_data)
@@ -70,9 +70,9 @@ classdef LinkManagerBase < handle
         end
 
         function is_visible = is_visible(obj, satellite, ground_station)
-            % 检查卫星对于地面站是否可见（满足基本几何条件）
-            % 输出:
-            %   is_visible (logical): 是否可见
+            % Checks if a satellite is visible to a ground station (satisfies basic geometric conditions).
+            % Output:
+            %   is_visible (logical): Whether it is visible
             is_visible = false;
             try
                 [~, elevation, range_m] = aer(satellite, ground_station, obj.scenario.SimulationTime);
@@ -80,34 +80,34 @@ classdef LinkManagerBase < handle
                     is_visible = true;
                 end
             catch ME
-                warning('无法计算几何关系 %s -> %s: %s', satellite.Name, ground_station.Name, ME.message);
+                warning('Could not calculate geometric relationship %s -> %s: %s', satellite.Name, ground_station.Name, ME.message);
             end
         end
         
         function active_links = get_active_links(obj)
-            % 获取当前活跃的链路列表
+            % Gets the list of currently active links.
             active_links = obj.active_links;
         end
 
     function [az, el, slantRange] = calculate_geometry(obj, sat_data, gs_data)
-            % 计算卫星和地面站之间的几何关系（无状态）
-            % 使用lla2aer函数进行计算，并强制进行类型转换以确保兼容性。
-            % 输入:
-            %   sat_data (struct): 卫星数据 {latitude, longitude, altitude}
-            %   gs_data (struct): 地面站数据 {latitude, longitude}
-            % 输出:
-            %   az (double): 方位角 (度)
-            %   el (double): 仰角 (度)
-            %   slantRange (double): 斜距 (米)
-            gs_alt = 0; % 假设地面站海拔为0
+            % Calculates the geometric relationship between a satellite and a ground station (stateless).
+            % Uses the lla2aer function for calculation and enforces type conversion to ensure compatibility.
+            % Input:
+            %   sat_data (struct): Satellite data {latitude, longitude, altitude}
+            %   gs_data (struct): Ground station data {latitude, longitude}
+            % Output:
+            %   az (double): Azimuth angle (degrees)
+            %   el (double): Elevation angle (degrees)
+            %   slantRange (double): Slant range (meters)
+            gs_alt = 0; % Assume ground station altitude is 0
             if isfield(gs_data, 'altitude') && ~isempty(gs_data.altitude)
                 gs_alt = gs_data.altitude;
             end
 
-            % 强制将所有输入转换为double类型，防止Python->MATLAB类型问题
+            % Enforce conversion of all inputs to double to prevent Python->MATLAB type issues
             sat_lat = double(sat_data.latitude);
             sat_lon = double(sat_data.longitude);
-            sat_alt_m = double(sat_data.altitude) * 1000; % 高度转换为米
+            sat_alt_m = double(sat_data.altitude) * 1000; % Convert altitude to meters
             gs_lat = double(gs_data.latitude);
             gs_lon = double(gs_data.longitude);
             gs_alt_m = double(gs_alt);
@@ -119,22 +119,22 @@ classdef LinkManagerBase < handle
     end
 
     methods (Abstract, Access = protected)
-        % 抽象方法 - 必须由子类实现
+        % Abstract method - must be implemented by subclasses
         best_satellite = select_best_satellite(obj, ground_station, satellites)
     end
     
     methods (Access = private)
         function constellation_sats = filter_constellation_satellites(obj, all_satellites_data)
-            % 过滤出属于本星座的卫星
-            % 输入: all_satellites_data (cell) - 包含卫星数据结构体的cell数组
+            % Filters out the satellites belonging to this constellation.
+            % Input: all_satellites_data (cell) - a cell array of satellite data structures
             
-            % 从cell数组中提取所有卫星的名称
+            % Extract all satellite names from the cell array
             names = cell(1, length(all_satellites_data));
             for i = 1:length(all_satellites_data)
                 if isfield(all_satellites_data{i}, 'name')
                     names{i} = all_satellites_data{i}.name;
                 else
-                    names{i} = ''; % 如果没有name字段，则为空
+                    names{i} = ''; % Empty if no name field
                 end
             end
 
@@ -143,10 +143,10 @@ classdef LinkManagerBase < handle
         end
 
         function link = create_link(obj, satellite_data, ground_station_data)
-            % 创建一个标准的链路信息结构体（无状态版本）
+            % Creates a standard link information structure (stateless version).
             link = [];
             try
-                % 使用无状态的几何计算函数
+                % Use the stateless geometry calculation function
                 [az, el, r_m] = obj.calculate_geometry(satellite_data, ground_station_data);
                 
                 link = struct(... 
@@ -158,12 +158,12 @@ classdef LinkManagerBase < handle
                     'range_km', r_m / 1000 ...
                 );
             catch ME
-                 warning('创建链路失败 %s -> %s: %s', satellite_data.name, ground_station_data.name, ME.message);
+                 warning('Failed to create link %s -> %s: %s', satellite_data.name, ground_station_data.name, ME.message);
             end
         end
 
         function update_active_link_list(obj, new_links)
-            % 更新活跃链路列表，并将旧链路存档
+            % Updates the active link list and archives old links.
             for i = 1:length(obj.active_links)
                 old_link = obj.active_links{i};
                 old_link.is_active = false;

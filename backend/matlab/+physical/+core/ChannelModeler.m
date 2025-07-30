@@ -1,9 +1,9 @@
 classdef ChannelModeler < handle
-    % ChannelModeler 卫星信道建模器
-    % 负责计算和应用各种传播效应，为物理层仿真提供精确的信道模型。
-    % 功能包括自由空间路径损耗、大气损耗、降雨衰减等。
+    % ChannelModeler Satellite channel modeler
+    % Responsible for calculating and applying various propagation effects, providing an accurate channel model for physical layer simulations.
+    % Functions include free-space path loss, atmospheric loss, rain attenuation, etc.
     %
-    % 参考文献:
+    % References:
     % [1] ITU-R Recommendation P.618-13: "Propagation data and prediction
     %     methods for the planning of Earth-space telecommunication systems"
     %     https://www.itu.int/rec/R-REC-P.618-13/en
@@ -13,18 +13,18 @@ classdef ChannelModeler < handle
     %     John Wiley & Sons. Chapter 4 & 5.
 
     properties (Access = public)
-        frequency_ghz % 工作频率 (GHz)
-        elevation_deg % 仰角 (度)
-        rain_rate_mmh = 5 % 降雨率 (mm/h)，默认值为中雨
+        frequency_ghz % Operating frequency (GHz)
+        elevation_deg % Elevation angle (degrees)
+        rain_rate_mmh = 5 % Rain rate (mm/h), default value for moderate rain
     end
 
     methods
 
         function obj = ChannelModeler(freq_ghz, elevation_deg)
-            % 构造函数
-            % 输入:
-            %   freq_ghz (double): 载波频率 (GHz)
-            %   elevation_deg (double): 终端仰角 (度)
+            % Constructor
+            % Input:
+            %   freq_ghz (double): Carrier frequency (GHz)
+            %   elevation_deg (double): Terminal elevation angle (degrees)
             if nargin > 0
                 obj.frequency_ghz = freq_ghz;
                 obj.elevation_deg = elevation_deg;
@@ -33,11 +33,11 @@ classdef ChannelModeler < handle
         end
 
         function total_loss = calculate_total_loss(obj, distance_km)
-            % 计算总传播损耗
-            % 输入:
-            %   distance_km (double): 星地距离 (km)
-            % 输出:
-            %   total_loss (double): 总损耗 (dB)
+            % Calculates the total propagation loss.
+            % Input:
+            %   distance_km (double): Satellite-ground distance (km)
+            % Output:
+            %   total_loss (double): Total loss (dB)
 
             fspl = obj.calculate_free_space_path_loss(distance_km);
             atm_loss = obj.calculate_atmospheric_loss();
@@ -47,23 +47,23 @@ classdef ChannelModeler < handle
         end
 
         function fspl = calculate_free_space_path_loss(obj, distance_km)
-            % 计算自由空间路径损耗 (FSPL)
-            % 公式依据参考文献 [3], 式 (4.7)
-            % 输入:
-            %   distance_km (double): 星地距离 (km)
-            % 输出:
-            %   fspl (double): 自由空间路径损耗 (dB)
+            % Calculates the Free Space Path Loss (FSPL).
+            % Formula based on reference [3], Eq. (4.7)
+            % Input:
+            %   distance_km (double): Satellite-ground distance (km)
+            % Output:
+            %   fspl (double): Free space path loss (dB)
 
             fspl = 20 * log10(distance_km) + 20 * log10(obj.frequency_ghz) + 92.45;
         end
 
         function atm_loss = calculate_atmospheric_loss(obj)
-            % 计算大气损耗 (简化的ITU-R P.676模型)
-            % 基于参考文献 [2] 中的图表和简化模型。
-            % 输出:
-            %   atm_loss (double): 大气损耗 (dB)
+            % Calculates atmospheric loss (simplified ITU-R P.676 model).
+            % Based on charts and simplified models in reference [2].
+            % Output:
+            %   atm_loss (double): Atmospheric loss (dB)
 
-            % 氧气和水蒸气的比衰减 (dB/km)，基于ITU图表的简化拟合值
+            % Specific attenuation of oxygen and water vapor (dB/km), based on simplified fitted values from ITU charts
             f = obj.frequency_ghz;
 
             if f < 10
@@ -77,24 +77,24 @@ classdef ChannelModeler < handle
                 gamma_w = 0.08;
             end
 
-            % 等效高度 (km)
-            h_o = 6; % 氧气
-            h_w = 2; % 水蒸气
+            % Equivalent height (km)
+            h_o = 6; % Oxygen
+            h_w = 2; % Water vapor
 
-            % 路径长度修正
+            % Path length correction
             path_factor = 1 / sind(obj.elevation_deg);
 
-            % 计算总损耗 (dB)
+            % Calculate total loss (dB)
             atm_loss = (gamma_o * h_o + gamma_w * h_w) * path_factor;
         end
 
         function rain_loss = calculate_rain_attenuation(obj)
-            % 计算降雨衰减 (简化的ITU-R P.618模型)
-            % 基于参考文献 [1] 中的方法。
-            % 输出:
-            %   rain_loss (double): 降雨衰减 (dB)
+            % Calculates rain attenuation (simplified ITU-R P.618 model).
+            % Based on the method in reference [1].
+            % Output:
+            %   rain_loss (double): Rain attenuation (dB)
 
-            % 根据频率计算k和alpha系数 (来自ITU-R P.838-3)
+            % Calculate k and alpha coefficients based on frequency (from ITU-R P.838-3)
             f = obj.frequency_ghz;
 
             if f < 20
@@ -105,14 +105,14 @@ classdef ChannelModeler < handle
                 alpha = 2.63 * f ^ -0.272;
             end
 
-            % 计算特定衰减 (dB/km)
+            % Calculate specific attenuation (dB/km)
             specific_attenuation = k * obj.rain_rate_mmh ^ alpha;
 
-            % 计算有效路径长度
-            h_rain = 3.0; % 0度等温线高度 (km, 简化值)
+            % Calculate effective path length
+            h_rain = 3.0; % 0-degree isotherm height (km, simplified value)
             effective_path = (h_rain / sind(obj.elevation_deg));
 
-            % 距离修正因子
+            % Distance correction factor
             r_factor = 1 / (1 + effective_path / (35 * exp(-0.015 * obj.rain_rate_mmh)));
 
             rain_loss = specific_attenuation * effective_path * r_factor;

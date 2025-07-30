@@ -8,7 +8,7 @@ from datetime import datetime
 
 class TleService:
     """
-    处理TLE数据的获取、缓存和定时更新。
+    Handles the fetching, caching, and periodic updating of TLE data.
     """
 
     def __init__(self):
@@ -23,46 +23,46 @@ class TleService:
 
     def get_tle_data(self, constellation_name: str) -> list:
         """
-        从Redis缓存中获取TLE数据。如果缓存不存在，则触发一次新的下载。
+        Gets TLE data from the Redis cache. If the cache does not exist, it triggers a new download.
         """
         constellation_name = constellation_name.lower()
         redis_key = f"tle:{constellation_name}"
         cached_data = self.redis_client.get(redis_key)
         if cached_data:
-            print(f"从Redis缓存中找到 {constellation_name} 的TLE数据。")
+            print(f"Found TLE data for {constellation_name} in Redis cache.")
             return json.loads(cached_data)
         else:
-            print(f"未找到 {constellation_name} 的缓存数据，正在执行首次下载...")
+            print(f"Cache not found for {constellation_name}, executing initial download...")
             return self.update_tle_data(constellation_name)
 
     def update_tle_data(self, constellation_name: str) -> list:
         """
-        从CelesTrak下载最新的TLE数据，解析后存入Redis。
+        Downloads the latest TLE data from CelesTrak, parses it, and stores it in Redis.
         """
         constellation_name = constellation_name.lower()
         if constellation_name not in self.tle_urls:
-            raise ValueError(f"不支持的星座: {constellation_name}")
+            raise ValueError(f"Unsupported constellation: {constellation_name}")
 
         try:
             response = requests.get(self.tle_urls[constellation_name], timeout=15)
-            response.raise_for_status()  # 如果请求失败则抛出异常
+            response.raise_for_status()  # Raise an exception if the request fails
 
             tle_list = self._parse_tle_text(response.text)
 
             redis_key = f"tle:{constellation_name}"
-            # 缓存24小时
+            # Cache for 24 hours
             self.redis_client.set(redis_key, json.dumps(tle_list), ex=86400)
             print(
-                f"已成功下载并缓存 {len(tle_list)} 条 {constellation_name} 的TLE数据。"
+                f"Successfully downloaded and cached {len(tle_list)} TLE entries for {constellation_name}."
             )
             return tle_list
         except requests.RequestException as e:
-            print(f"下载 {constellation_name} TLE数据时发生网络错误: {e}")
+            print(f"A network error occurred while downloading {constellation_name} TLE data: {e}")
             raise
 
     def _parse_tle_text(self, tle_text: str) -> list:
         """
-        将原始TLE文本解析为结构化的列表。
+        Parses the raw TLE text into a structured list.
         """
         lines = tle_text.strip().splitlines()
         tle_list = []
@@ -77,5 +77,5 @@ class TleService:
         return tle_list
 
 
-# 创建TleService的单例
+# Create a singleton instance of TleService
 tle_service = TleService()

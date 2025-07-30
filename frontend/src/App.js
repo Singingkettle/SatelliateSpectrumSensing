@@ -36,7 +36,7 @@ function App() {
             boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
           }}
         >
-          {/* 左上角卫星图标 */}
+          {/* Satellite Icon in the top-left corner */}
           <div style={{
             padding: '16px 20px',
             borderBottom: '1px solid #3e3e42',
@@ -64,7 +64,7 @@ function App() {
             </span>
           </div>
 
-          {/* 控制面板内容 */}
+          {/* Control Panel Content */}
           <div style={{ padding: '0' }}>
             <SimulationTimeController />
             <ConstellationSelector />
