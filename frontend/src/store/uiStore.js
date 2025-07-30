@@ -1,14 +1,18 @@
 import { create } from 'zustand'
 
 // Constants
-export const SIDER_WIDTH = 380 // keep in sync with App.js
-export const EDGE_HOVER_WIDTH = 20 // pixels width of invisible hover area when panel is collapsed
+export const SIDER_WIDTH = 380
+export const EDGE_HOVER_WIDTH = 20 // (unused for vertical animation now)
+export const EDGE_HOVER_HEIGHT = 20 // height of invisible top hover area when panel is collapsed
 
-// Simple UI store to manage left panel state
 export const useUiStore = create((set) => ({
     panelCollapsed: true,
     panelPinned: false,
-    setPanelCollapsed: (panelCollapsed) => set({ panelCollapsed }),
+    setPanelCollapsed: (panelCollapsed) =>
+        set((state) => (state.panelCollapsed === panelCollapsed ? state : { panelCollapsed })),
     togglePanelPinned: () =>
-        set((state) => ({ panelPinned: !state.panelPinned, panelCollapsed: false })),
+        set((state) => {
+            const nextPinned = !state.panelPinned
+            return nextPinned ? { panelPinned: nextPinned, panelCollapsed: false } : { panelPinned: nextPinned }
+        }),
 }))

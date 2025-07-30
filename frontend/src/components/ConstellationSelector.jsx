@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { shallow } from 'zustand/shallow';
 import { Checkbox, Spin, Typography } from 'antd';
 import { GlobalOutlined, DownOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -10,17 +11,12 @@ const { Text } = Typography;
 const ConstellationSelector = () => {
   const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const constellations = useConstellationStore((state) => state.constellations);
-  const loading = useConstellationStore(
-    (state) => state.loading && state.constellations.length === 0
-  );
-  const error = useConstellationStore((state) => state.error);
-  const selectedConstellations = useConstellationStore(
-    (state) => state.selectedConstellations
-  );
-  const setSelectedConstellations = useConstellationStore(
-    (state) => state.setSelectedConstellations
-  );
+  const constellations = useConstellationStore((s) => s.constellations, shallow)
+  const loading = useConstellationStore((s) => s.loading && s.constellations.length === 0)
+  const error = useConstellationStore((s) => s.error)
+  const selectedConstellations = useConstellationStore((s) => s.selectedConstellations, shallow)
+  const setSelectedConstellations = useConstellationStore((s) => s.setSelectedConstellations)
+  const handleChange = useCallback((vals) => setSelectedConstellations(vals), [setSelectedConstellations])
 
   return (
     <div className="control-panel">
@@ -46,7 +42,7 @@ const ConstellationSelector = () => {
             <Checkbox.Group
               style={{ width: '100%' }}
               value={selectedConstellations}
-              onChange={setSelectedConstellations}
+              onChange={handleChange}
             >
               <div className="constellation-list">
                 {constellations.map((constellation) => (
@@ -70,9 +66,10 @@ const ConstellationSelector = () => {
             </Checkbox.Group>
           )}
         </Spin>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 
-export default ConstellationSelector;
+export default React.memo(ConstellationSelector);

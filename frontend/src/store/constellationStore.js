@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import * as Cesium from 'cesium';
 import { getSupportedConstellations, getTleData } from '../api/constellationApi';
 
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
 // Define a color map for different constellations
 const CONSTELLATION_COLORS = {
   Starlink: Cesium.Color.CYAN,        // 青色 - SpaceX的经典颜色
@@ -15,8 +17,8 @@ export const useConstellationStore = create((set, get) => {
   const initialStartTime = new Date();
   const initialEndTime = new Date(initialStartTime.getTime() + 24 * 3600 * 1000);
 
-  // 输出初始化log
-  console.log(`[时间设置] 第1次成功设置时间(初始化):`, {
+  // 输出初始化log（仅开发环境）
+  if (IS_DEV) console.log(`[时间设置] 第1次成功设置时间(初始化):`, {
     startTime: initialStartTime,
     endTime: initialEndTime,
     duration: `${Math.round((initialEndTime - initialStartTime) / (1000 * 60 * 60 * 24))}天`
@@ -43,7 +45,7 @@ export const useConstellationStore = create((set, get) => {
       if (times && times.length === 2) {
         set((state) => {
           const newCount = state.timeSetCount + 1;
-          console.log(`[时间设置] 第${newCount}次成功设置时间:`, {
+          if (IS_DEV) console.log(`[时间设置] 第${newCount}次成功设置时间:`, {
             startTime: times[0],
             endTime: times[1],
             duration: `${Math.round((times[1] - times[0]) / (1000 * 60 * 60 * 24))}天`

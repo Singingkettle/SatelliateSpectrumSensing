@@ -1,7 +1,7 @@
 .status-display-container {
     position: absolute;
     top: 20px;
-    left: 20px;
+    right: 20px;
     z-index: 10;
     background-color: rgba(20, 20, 20, 0.7);
     backdrop-filter: blur(10px);

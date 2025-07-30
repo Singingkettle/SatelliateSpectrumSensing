@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { shallow } from 'zustand/shallow';
 import { Switch, Typography, Dropdown, Button, Menu } from 'antd';
 import { SettingOutlined, DownOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +11,12 @@ const { Text } = Typography;
 const DisplaySettings = () => {
     const { t, i18n } = useTranslation();
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const showOrbits = useConstellationStore((state) => state.showOrbits);
-    const setOrbitDisplay = useConstellationStore((state) => state.setOrbitDisplay);
+    const showOrbits = useConstellationStore((s) => s.showOrbits, shallow)
+    const setOrbitDisplay = useConstellationStore((s) => s.setOrbitDisplay)
 
-    const handleOrbitToggle = (checked) => {
-        setOrbitDisplay(checked);
-    };
+    const handleOrbitToggle = useCallback((checked) => {
+        setOrbitDisplay(checked)
+    }, [setOrbitDisplay])
 
     const handleLanguageChange = (e) => {
         i18n.changeLanguage(e.key);
@@ -75,4 +76,4 @@ const DisplaySettings = () => {
     );
 };
 
-export default DisplaySettings;
+export default React.memo(DisplaySettings);
