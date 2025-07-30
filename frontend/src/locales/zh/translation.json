@@ -1,14 +1,14 @@
 {
   "constellationSelectorTitle": "卫星星座",
-  "simulationTimeControlTitle": "仿真时间控制",
-  "displaySettingsTitle": "显示设置",
+  "simulationTimeControlTitle": "时间",
+  "displaySettingsTitle": "显示",
   "satelliteSelectionTitle": "卫星选择",
   "satelliteNameColumn": "卫星名称",
   "loadingConstellations": "正在加载星座列表...",
   "loadingTleData": "正在加载TLE数据...",
-  "startAndEndTime": "起始与终止时间",
-  "timeStep": "时间步长 (秒)",
-  "orbitDisplay": "轨道显示",
+  "startAndEndTime": "范围",
+  "timeStep": "步长 (秒)",
+  "orbitDisplay": "轨道",
   "orbitDisplayDescriptionOn": "显示所有已加载卫星的完整轨道椭圆",
   "orbitDisplayDescriptionOff": "隐藏所有已加载卫星的完整轨道椭圆",
   "loadedSatellites": "已加载: {{count}} 颗卫星",
@@ -19,5 +19,8 @@
   "startTime": "开始时间",
   "endTime": "结束时间",
   "statusOn": "开启",
-  "statusOff": "关闭"
+  "statusOff": "关闭",
+  "satellitePanelTitle": "卫星",
+  "selectConstellations": "选择星座",
+  "systemTitle": "卫星仿真"
 }

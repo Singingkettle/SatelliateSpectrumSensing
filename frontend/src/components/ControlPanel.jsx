@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react'
 import { Tooltip } from 'antd'
 import { PushpinOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useUiStore } from '../store/uiStore'
 import SimulationTimeController from './SimulationTimeController'
-import ConstellationSelector from './ConstellationSelector'
-import SatelliteSelectionView from './SatelliteSelectionView'
+import SatellitePanel from './SatellitePanel'
 import DisplaySettings from './DisplaySettings'
 import '../styles/ControlPanel.css'
 
@@ -17,6 +17,7 @@ const LOGO_ICON_STYLE = {
 }
 
 function ControlPanel() {
+    const { t } = useTranslation()
     const panelCollapsed = useUiStore((s) => s.panelCollapsed)
     const panelPinned = useUiStore((s) => s.panelPinned)
     const setPanelCollapsed = useUiStore((s) => s.setPanelCollapsed)
@@ -46,7 +47,7 @@ function ControlPanel() {
         >
             <div className="side-panel-header">
                 <div style={LOGO_ICON_STYLE}>🛰️</div>
-                <span className="side-panel-title">Satellite Simulation</span>
+                <span className="side-panel-title">{t('systemTitle')}</span>
                 <Tooltip title={panelPinned ? '取消固定' : '固定面板'}>
                     <PushpinOutlined
                         rotate={panelPinned ? 0 : 90}
@@ -58,8 +59,7 @@ function ControlPanel() {
 
             <div style={{ padding: 0 }}>
                 <SimulationTimeController />
-                <ConstellationSelector />
-                <SatelliteSelectionView />
+                <SatellitePanel />
                 <DisplaySettings />
             </div>
         </aside>

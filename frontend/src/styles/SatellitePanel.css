@@ -1,0 +1,37 @@
+/* SatellitePanel custom styles for dark theme Select dropdown */
+
+/* Override Ant Design Select default styling for dark theme */
+.constellation-select-dropdown .ant-select-item {
+    color: #e0e0e0 !important;
+    background-color: #3c3c3c !important;
+}
+
+.constellation-select-dropdown .ant-select-item-option-active {
+    background-color: #4a4a4a !important;
+}
+
+.constellation-select-dropdown .ant-select-item-option-selected {
+    background-color: #0095ff !important;
+    color: #ffffff !important;
+}
+
+/* Ensure Select input text is visible in dark theme */
+.control-panel .ant-select-selector {
+    background-color: #3c3c3c !important;
+    border: 1px solid #5a5a5a !important;
+    color: #e0e0e0 !important;
+}
+
+.control-panel .ant-select-selection-placeholder {
+    color: #a0a0a0 !important;
+}
+
+.control-panel .ant-select-selection-item {
+    color: #e0e0e0 !important;
+    background-color: rgba(0, 149, 255, 0.2) !important;
+    border: 1px solid #0095ff !important;
+}
+
+.control-panel .ant-select-arrow {
+    color: #a0a0a0 !important;
+}
