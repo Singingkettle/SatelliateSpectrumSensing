@@ -1,5 +1,10 @@
 # Frontend Issue Fixes Summary
 
+> Update (latest):
+> - Added Monitoring panel with Co-orbiting companion satellite generation (one-shot TLE). Companion joins global and per-satellite orbit visibility.
+> - Custom InfoBox overlay supports per-satellite orbit override with precedence, normalized entity names for accurate targeting; companion Info routes to `/companion/:id`.
+> - Status bar (top-right) shows Loaded count including companion, Monitoring target id, and fully localized Day/Night + View labels.
+
 ## Fixed Issues
 
 ### 1. Left Control Panel Color Scheme Issue ✅

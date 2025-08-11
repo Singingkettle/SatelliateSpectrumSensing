@@ -12,6 +12,9 @@ Key capabilities:
 - Interactive 2D/3D view toggle
 - Constellation and satellite selection (merged, compact UI)
 - Robust performance under thousands of satellites (render tuning)
+- Monitoring panel with Co‑orbiting companion satellite generation (simulated TLE)
+- Companion static info page `/companion/:id`
+- i18n status bar with Loaded, Orbit, Day/Night, View, and monitoring target id
 
 Reference implementation for orbits and time‑evolving paths is inspired by satvis [Flowm/satvis](https://github.com/Flowm/satvis).
 
@@ -33,6 +36,7 @@ Reference implementation for orbits and time‑evolving paths is inspired by sat
 The frontend is a CesiumJS application with the following features:
 - Time‑evolving orbit tracks using PathGraphics + SampledPositionProperty (satvis‑style)
 - Constellation/Satellite selection merged into a single "Satellites" panel
+- Monitoring panel with Co‑orbiting (companion) controls
 - Day/Night lighting toggle (atmosphere + sun/moon + globe lighting)
 - View mode toggle (2D / 3D)
 - Request‑on‑demand rendering and scene tuning for performance (30 FPS cap while animating)
@@ -52,11 +56,12 @@ npm run build
 
 ### 3.3 UX Controls
 - Satellites panel: select constellations, pick satellites (tabs), pagination supports up to 1000 per page
+- Monitoring panel: pick strategy, target from selected satellites, and companion distance
 - Display panel:
   - Orbit: on/off (show/hide PathGraphics tracks)
   - Day/Night: on/off (globe.enableLighting, sun/moon, atmosphere)
   - View: 2D / 3D (scene.morphTo2D / morphTo3D)
-- Status bar (top‑right): displays Loaded, Orbit, Day/Night, View
+- Status bar (top‑right): displays Loaded (includes companion), Orbit, Day/Night, View, Monitoring target id (i18n)
 
 ### 3.4 Scene & Lighting (what we enable)
 - skyAtmosphere.show = true
@@ -98,7 +103,7 @@ Refactored three‑layer structure:
 ## 7. Documentation
 - Python Backend Design: `doc/python_backend_design.md`
 - Orbit Visualization Guide: `doc/orbit_visualization_guide.md`
-  - Explains time‑evolving tracks (PathGraphics), lighting & view toggles, performance notes
+  - Explains time‑evolving tracks (PathGraphics), companion TLE, lighting & view toggles, performance notes
 - Fixes & Notes: `doc/frontend_fixes_summary.md`
 
 ## 8. Notes

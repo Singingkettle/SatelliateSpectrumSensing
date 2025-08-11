@@ -50,3 +50,8 @@ Notes:
 ## References
 - satvis orbit/path architecture: [Flowm/satvis](https://github.com/Flowm/satvis)
 - CesiumJS PathGraphics & SampledPositionProperty (time-dynamic paths)
+
+## Companion satellites
+- Monitoring → Co-orbiting creates a simulated companion by generating a one-shot TLE derived from the target TLE with an along-track offset.
+- The companion participates in orbit visibility like normal satellites and can be toggled individually via the InfoBox orbit switch (per-satellite override precedes global state).
+- The companion has an internal info page at `/companion/:id`.

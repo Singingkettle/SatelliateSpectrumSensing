@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useUiStore } from '../store/uiStore'
 import SimulationTimeController from './SimulationTimeController'
 import SatellitePanel from './SatellitePanel'
+import MonitoringSettings from './MonitoringSettings'
 import DisplaySettings from './DisplaySettings'
 import '../styles/ControlPanel.css'
 
@@ -60,6 +61,7 @@ function ControlPanel() {
             <div style={{ padding: 0 }}>
                 <SimulationTimeController />
                 <SatellitePanel />
+                <MonitoringSettings />
                 <DisplaySettings />
             </div>
         </aside>

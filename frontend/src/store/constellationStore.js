@@ -17,7 +17,6 @@ export const useConstellationStore = create((set, get) => {
   const initialStartTime = new Date();
   const initialEndTime = new Date(initialStartTime.getTime() + 24 * 3600 * 1000);
 
-  // 输出初始化log（仅开发环境）
   if (IS_DEV) console.log(`[时间设置] 第1次成功设置时间(初始化):`, {
     startTime: initialStartTime,
     endTime: initialEndTime,
@@ -35,13 +34,22 @@ export const useConstellationStore = create((set, get) => {
     selectedSatellites: {},
     loading: false,
     error: null,
-    showOrbits: false, // 控制轨道椭圆显示（完整轨道）
-    pageSize: 10, // 每页显示的卫星数量
-    timeSetCount: 1, // 时间设置次数计数器，初始化算第1次
+    showOrbits: false,
+    pageSize: 10,
+    timeSetCount: 1,
 
-    // 显示/渲染相关
-    lightingEnabled: false, // 地球日夜光照
-    sceneMode: '3D', // '2D' | '3D'
+    // display
+    lightingEnabled: false,
+    sceneMode: '3D',
+
+    // monitoring
+    monitoringStrategy: 'none', // 'none' | 'accompany'
+    monitoringTarget: null,     // satellite name
+    monitoringDistanceKm: 5,
+    companionName: null,        // runtime-created companion satellite name when active
+
+    // per-satellite orbit overrides: { [satName]: true|false } (undefined -> follow global)
+    orbitOverrides: {},
 
     // --- ACTIONS ---
 
@@ -54,15 +62,9 @@ export const useConstellationStore = create((set, get) => {
             endTime: times[1],
             duration: `${Math.round((times[1] - times[0]) / (1000 * 60 * 60 * 24))}天`
           });
-          return {
-            startTime: times[0],
-            endTime: times[1],
-            timeSetCount: newCount
-          };
+          return { startTime: times[0], endTime: times[1], timeSetCount: newCount };
         });
-      } else {
-        set({ startTime: null, endTime: null });
-      }
+      } else set({ startTime: null, endTime: null });
     },
 
     setTimeStep: (step) => set({ timeStep: step || 1 }),
@@ -71,11 +73,7 @@ export const useConstellationStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const response = await getSupportedConstellations();
-        const formatted = response.data.map((c) => ({
-          label: c.name,
-          value: c.name,
-          description: c.description,
-        }));
+        const formatted = response.data.map((c) => ({ label: c.name, value: c.name, description: c.description }));
         set({ constellations: formatted, loading: false });
       } catch (error) {
         const msg = error.response?.data?.message || '获取星座列表失败';
@@ -97,9 +95,7 @@ export const useConstellationStore = create((set, get) => {
         }
       });
 
-      const constellationsToFetch = selected.filter(
-        (name) => !currentSelection.includes(name)
-      );
+      const constellationsToFetch = selected.filter((name) => !currentSelection.includes(name));
 
       try {
         for (const name of constellationsToFetch) {
@@ -107,11 +103,7 @@ export const useConstellationStore = create((set, get) => {
           newTleData[name] = response.data;
           newSelectedSatellites[name] = [];
         }
-        set({
-          tleData: newTleData,
-          selectedSatellites: newSelectedSatellites,
-          loading: false
-        });
+        set({ tleData: newTleData, selectedSatellites: newSelectedSatellites, loading: false });
       } catch (error) {
         const msg = error.response?.data?.message || '获取TLE数据失败';
         set({ error: msg, loading: false });
@@ -120,10 +112,7 @@ export const useConstellationStore = create((set, get) => {
 
     toggleSatelliteSelection: (constellationName, satelliteNames) => {
       set((state) => ({
-        selectedSatellites: {
-          ...state.selectedSatellites,
-          [constellationName]: satelliteNames,
-        },
+        selectedSatellites: { ...state.selectedSatellites, [constellationName]: satelliteNames },
       }));
     },
 
@@ -131,22 +120,27 @@ export const useConstellationStore = create((set, get) => {
       return CONSTELLATION_COLORS[constellationName] || CONSTELLATION_COLORS.Default;
     },
 
-    // Methods related to orbit control
-    toggleOrbitDisplay: () => {
-      set((state) => ({ showOrbits: !state.showOrbits }));
-    },
+    toggleOrbitDisplay: () => set((state) => ({ showOrbits: !state.showOrbits })),
+    setOrbitDisplay: (show) => set({ showOrbits: show }),
+    setPageSize: (size) => set({ pageSize: size }),
 
-    setOrbitDisplay: (show) => {
-      set({ showOrbits: show });
-    },
-
-    // Set the number of items to display per page
-    setPageSize: (size) => {
-      set({ pageSize: size });
-    },
-
-    // Lighting & scene mode
     setLightingEnabled: (enabled) => set({ lightingEnabled: !!enabled }),
     setSceneMode: (mode) => set({ sceneMode: mode === '2D' ? '2D' : '3D' }),
+
+    // monitoring actions
+    setMonitoringStrategy: (strategy) => set({ monitoringStrategy: strategy || 'none' }),
+    setMonitoringTarget: (satName) => set({ monitoringTarget: satName || null }),
+    setMonitoringDistanceKm: (km) => set({ monitoringDistanceKm: typeof km === 'number' ? km : 5 }),
+    setCompanionName: (name) => set({ companionName: name || null }),
+
+    // per-satellite orbit override
+    setOrbitOverride: (satName, value) => set((state) => ({
+      orbitOverrides: { ...state.orbitOverrides, [satName]: value },
+    })),
+    clearOrbitOverride: (satName) => set((state) => {
+      const next = { ...state.orbitOverrides }
+      delete next[satName]
+      return { orbitOverrides: next }
+    }),
   };
 });

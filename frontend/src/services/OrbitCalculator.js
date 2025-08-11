@@ -30,14 +30,49 @@ class Orbit {
   }
 
   positionECI(time) {
-    return satellite.propagate(this.satrec, time).position;
+    const result = satellite.propagate(this.satrec, time);
+    return result && result.position ? result.position : null;
+  }
+
+  /**
+   * Sample orbit positions for one full orbital period, returns Cartesian3[] in meters.
+   */
+  getOrbitPositions(startDate, samples = 120) {
+    const positions = []
+    const periodSec = this.orbitalPeriod * 60
+    const step = periodSec / samples
+    for (let i = 0; i <= samples; i++) {
+      const date = new Date(startDate.getTime() + i * step * 1000)
+      const eci = this.positionECI(date)
+      if (!eci) continue
+      positions.push(new Cesium.Cartesian3(eci.x * 1000, eci.y * 1000, eci.z * 1000))
+    }
+    return positions
+  }
+
+  /**
+   * Sample orbit positions by fixed step (seconds), no interpolation.
+   * Ensures sampling strictly follows the given step across one orbital period.
+   */
+  getOrbitPositionsByStep(startDate, stepSeconds) {
+    const positions = []
+    const periodSec = this.orbitalPeriod * 60
+    const step = Math.max(0.1, Number(stepSeconds) || 1) // guard
+    const totalSteps = Math.max(2, Math.floor(periodSec / step))
+    for (let i = 0; i <= totalSteps; i++) {
+      const date = new Date(startDate.getTime() + i * step * 1000)
+      const eci = this.positionECI(date)
+      if (!eci) continue
+      positions.push(new Cesium.Cartesian3(eci.x * 1000, eci.y * 1000, eci.z * 1000))
+    }
+    return positions
   }
 
   positionECF(time) {
     const positionEci = this.positionECI(time);
+    if (!positionEci) return null;
     const gmst = satellite.gstime(time);
-    const positionEcf = satellite.eciToEcf(positionEci, gmst);
-    return positionEcf;
+    return satellite.eciToEcf(positionEci, gmst);
   }
 }
 
