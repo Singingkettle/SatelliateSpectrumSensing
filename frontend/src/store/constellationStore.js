@@ -39,6 +39,10 @@ export const useConstellationStore = create((set, get) => {
     pageSize: 10, // 每页显示的卫星数量
     timeSetCount: 1, // 时间设置次数计数器，初始化算第1次
 
+    // 显示/渲染相关
+    lightingEnabled: false, // 地球日夜光照
+    sceneMode: '3D', // '2D' | '3D'
+
     // --- ACTIONS ---
 
     setSimulationTime: (times) => {
@@ -140,5 +144,9 @@ export const useConstellationStore = create((set, get) => {
     setPageSize: (size) => {
       set({ pageSize: size });
     },
+
+    // Lighting & scene mode
+    setLightingEnabled: (enabled) => set({ lightingEnabled: !!enabled }),
+    setSceneMode: (mode) => set({ sceneMode: mode === '2D' ? '2D' : '3D' }),
   };
 });

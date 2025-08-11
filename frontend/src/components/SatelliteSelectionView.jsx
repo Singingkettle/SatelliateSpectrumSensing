@@ -50,7 +50,7 @@ const SatelliteSelectionView = () => {
                         pageSize,
                         simple: true,
                         showSizeChanger: true,
-                        pageSizeOptions: ['5', '10', '20', '50', '100'],
+                        pageSizeOptions: ['5', '10', '20', '50', '100', '500', '1000'],
                         onShowSizeChange: (_cur, size) => setPageSize(size),
                         size: 'small',
                         className: 'satellite-pagination',

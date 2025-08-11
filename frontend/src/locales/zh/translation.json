@@ -22,5 +22,8 @@
   "statusOff": "关闭",
   "satellitePanelTitle": "卫星",
   "selectConstellations": "选择星座",
-  "systemTitle": "卫星仿真"
+  "systemTitle": "卫星仿真",
+  "dayNight": "日夜",
+  "dayNightDescription": "启用地球光照以呈现白天/黑夜",
+  "viewMode": "视图"
 }

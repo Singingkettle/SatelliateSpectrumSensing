@@ -22,5 +22,8 @@
   "statusOff": "Off",
   "satellitePanelTitle": "Satellites",
   "selectConstellations": "Select Constellations",
-  "systemTitle": "Satellite Simulation"
+  "systemTitle": "Satellite Simulation",
+  "dayNight": "Day/Night",
+  "dayNightDescription": "Enable globe lighting to render day/night",
+  "viewMode": "View"
 }

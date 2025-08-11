@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
-import { Switch, Typography, Dropdown, Button, Menu } from 'antd';
+import { Switch, Typography, Dropdown, Button, Menu, Select } from 'antd';
 import { SettingOutlined, DownOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useConstellationStore } from '../store/constellationStore';
@@ -11,8 +11,15 @@ const { Text } = Typography;
 const DisplaySettings = () => {
     const { t, i18n } = useTranslation();
     const [isCollapsed, setIsCollapsed] = useState(false);
+
     const showOrbits = useConstellationStore((s) => s.showOrbits, shallow)
     const setOrbitDisplay = useConstellationStore((s) => s.setOrbitDisplay)
+
+    const lightingEnabled = useConstellationStore((s) => s.lightingEnabled)
+    const setLightingEnabled = useConstellationStore((s) => s.setLightingEnabled)
+
+    const sceneMode = useConstellationStore((s) => s.sceneMode)
+    const setSceneMode = useConstellationStore((s) => s.setSceneMode)
 
     const handleOrbitToggle = useCallback((checked) => {
         setOrbitDisplay(checked)
@@ -53,15 +60,12 @@ const DisplaySettings = () => {
                         </Dropdown>
                     </div>
 
-                    {/* Orbit Trail Control */}
+                    {/* Orbit Toggle */}
                     <div className="control-item">
                         <div>
                             <Text className="control-label">{t('orbitDisplay')}</Text>
                             <Text className="control-description">
-                                {showOrbits
-                                    ? t('orbitDisplayDescriptionOn')
-                                    : t('orbitDisplayDescriptionOff')
-                                }
+                                {showOrbits ? t('orbitDisplayDescriptionOn') : t('orbitDisplayDescriptionOff')}
                             </Text>
                         </div>
                         <Switch
@@ -70,10 +74,38 @@ const DisplaySettings = () => {
                             size="small"
                         />
                     </div>
+
+                    {/* Lighting Toggle */}
+                    <div className="control-item">
+                        <div>
+                            <Text className="control-label">{t('dayNight')}</Text>
+                            <Text className="control-description">{t('dayNightDescription', '启用地球光照以呈现白天/黑夜')}</Text>
+                        </div>
+                        <Switch
+                            checked={lightingEnabled}
+                            onChange={setLightingEnabled}
+                            size="small"
+                        />
+                    </div>
+
+                    {/* Scene Mode */}
+                    <div className="control-item">
+                        <Text className="control-label">{t('viewMode')}</Text>
+                        <Select
+                            size="small"
+                            value={sceneMode}
+                            style={{ width: 120 }}
+                            onChange={setSceneMode}
+                            options={[
+                                { label: '3D', value: '3D' },
+                                { label: '2D', value: '2D' },
+                            ]}
+                        />
+                    </div>
                 </div>
             )}
         </div>
     );
 };
 
-export default React.memo(DisplaySettings);
+export default DisplaySettings;

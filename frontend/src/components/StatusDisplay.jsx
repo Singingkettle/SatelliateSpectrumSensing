@@ -8,6 +8,9 @@ function StatusDisplay() {
     const { t } = useTranslation()
     const showOrbits = useConstellationStore((state) => state.showOrbits)
     const selectedSatellites = useConstellationStore((state) => state.selectedSatellites)
+    const lightingEnabled = useConstellationStore((s) => s.lightingEnabled)
+    const sceneMode = useConstellationStore((s) => s.sceneMode)
+
     const totalSelectedSatellites = Object.values(selectedSatellites).reduce(
         (total, sats) => total + sats.length,
         0,
@@ -28,6 +31,18 @@ function StatusDisplay() {
                 <span>
                     {t('orbitDisplay')}: {showOrbits ? t('statusOn') : t('statusOff')}
                 </span>
+            </div>
+            <div className="status-item">
+                {lightingEnabled ? (
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                ) : (
+                    <CloseCircleOutlined style={{ color: '#f14c4c' }} />
+                )}
+                <span>光照: {lightingEnabled ? '开启' : '关闭'}</span>
+            </div>
+            <div className="status-item">
+                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                <span>视图: {sceneMode}</span>
             </div>
         </div>
     )
