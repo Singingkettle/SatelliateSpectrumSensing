@@ -1,0 +1,30 @@
+/* Status Bar Styles */
+
+.status-bar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  background: rgba(22, 33, 62, 0.9);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  z-index: 50;
+  font-size: 12px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.status-value {
+  color: #fff;
+  font-weight: 500;
+}

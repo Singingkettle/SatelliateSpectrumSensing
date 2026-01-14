@@ -6,12 +6,6 @@ module.exports = {
       plugin: CracoCesiumPlugin(),
     },
   ],
-  // Add Babel plugins for on-demand importing of Ant Design components & icons
-  babel: {
-    plugins: [
-      // Automatically import component CSS as well
-      ['import', { libraryName: 'antd', libraryDirectory: 'es', style: true }],
-
-    ],
-  },
+  // Note: babel-plugin-import is not needed for antd v5+
+  // antd v5 uses CSS-in-JS, so no separate CSS import is required
 }

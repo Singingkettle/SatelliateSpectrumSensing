@@ -1,0 +1,71 @@
+/* Constellation Panel Styles */
+/* Note: Main styles are in ControlPanel.css */
+
+.constellation-panel {
+  height: 100%;
+}
+
+.constellation-panel.loading,
+.constellation-panel.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.constellation-list {
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+}
+
+.constellation-item {
+  cursor: pointer;
+  padding: 12px !important;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.2s ease;
+}
+
+.constellation-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.constellation-item.selected {
+  background: rgba(24, 144, 255, 0.15);
+  border-left: 3px solid #1890ff;
+}
+
+.constellation-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.constellation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.constellation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.constellation-description {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.constellation-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

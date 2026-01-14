@@ -20,6 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.cursorrules
 
 # Python virtual environments
 env/
@@ -60,6 +61,7 @@ lerna-debug.log*
 frontend/build/
 frontend/dist/
 frontend/.env.local
+frontend/.env.development
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
@@ -285,3 +287,31 @@ satvis/
 # Development documentation and planning files
 前端
 FRONTEND_DEV_DOC.md 
+.specstory/
+
+# Cursor IDE files
+.cursorindexingignore
+.cursor/
+
+# Backend environment files
+backend/.env
+backend/.env.local
+backend/.env.production
+backend/env/
+
+# Database and cache files
+*.db-journal
+*.sqlite-journal
+backend/data/
+backend/cache/
+backend/logs/
+
+# Python compiled files
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+
+# Scripts (may contain sensitive info)
+scripts/*.ps1.bak
+scripts/*.sh.bak

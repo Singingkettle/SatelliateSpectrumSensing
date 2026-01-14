@@ -1,0 +1,65 @@
+/* Satellite Info Panel Styles */
+
+.satellite-info-panel {
+  height: 100%;
+}
+
+.satellite-info-panel.empty,
+.satellite-info-panel.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  gap: 16px;
+}
+
+.satellite-card {
+  background: transparent !important;
+  border: none !important;
+}
+
+.satellite-card .ant-card-head {
+  padding: 0;
+  border: none !important;
+  min-height: auto;
+}
+
+.satellite-card .ant-card-head-title {
+  padding: 0;
+}
+
+.satellite-card .ant-card-body {
+  padding: 16px 0;
+}
+
+.card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tle-data {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.tle-line {
+  display: block;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  word-break: break-all;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.tle-epoch {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+}

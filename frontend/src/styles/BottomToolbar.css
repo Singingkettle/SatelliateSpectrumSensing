@@ -1,0 +1,205 @@
+/* Bottom Toolbar Styles - Matching satellitemap.space */
+/* Independent small panels at bottom, no full-width container */
+
+.bottom-toolbar {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(10, 10, 15, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px 6px;
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.toolbar-center {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.toolbar-center .toolbar-btn {
+  width: 44px;
+  height: 44px;
+  background: rgba(10, 10, 15, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.toolbar-center .toolbar-btn:hover {
+  background: rgba(30, 30, 40, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.toolbar-btn.active {
+  background: rgba(29, 161, 242, 0.15);
+  color: #1DA1F2;
+}
+
+/* Color variants matching satellitemap.space */
+.toolbar-btn.color-yellow {
+  color: rgba(234, 179, 8, 0.7);
+}
+
+.toolbar-btn.color-yellow:hover {
+  color: rgba(234, 179, 8, 1);
+}
+
+.toolbar-btn.color-yellow.active {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.toolbar-btn.color-blue {
+  color: rgba(59, 130, 246, 0.7);
+}
+
+.toolbar-btn.color-blue:hover {
+  color: rgba(59, 130, 246, 1);
+}
+
+.toolbar-btn.color-blue.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.toolbar-btn.color-purple {
+  color: rgba(168, 85, 247, 0.7);
+}
+
+.toolbar-btn.color-purple:hover {
+  color: rgba(168, 85, 247, 1);
+}
+
+.toolbar-btn.color-purple.active {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.toolbar-btn.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.toolbar-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.toolbar-text-icon {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+}
+
+/* FPS Counter */
+.fps-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Monaco', 'Consolas', monospace;
+  min-width: 36px;
+}
+
+.fps-value {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.fps-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .bottom-toolbar {
+    bottom: 8px;
+    padding: 0 8px;
+  }
+  
+  .toolbar-left {
+    padding: 3px 4px;
+    gap: 1px;
+  }
+  
+  .toolbar-btn {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .toolbar-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .fps-counter {
+    display: none;
+  }
+  
+  .toolbar-center .toolbar-btn {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar-left {
+    overflow-x: auto;
+    max-width: calc(100vw - 100px);
+  }
+  
+  .toolbar-divider {
+    display: none;
+  }
+}

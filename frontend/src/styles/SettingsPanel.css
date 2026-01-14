@@ -1,0 +1,38 @@
+/* Settings Panel Styles */
+
+.settings-panel {
+  height: 100%;
+}
+
+.settings-card {
+  background: transparent !important;
+  border: none !important;
+}
+
+.settings-card .ant-card-body {
+  padding: 0;
+}
+
+.settings-section {
+  margin-bottom: 16px;
+}
+
+.settings-section > span:first-child {
+  display: block;
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.setting-item .ant-space {
+  color: rgba(255, 255, 255, 0.85);
+}

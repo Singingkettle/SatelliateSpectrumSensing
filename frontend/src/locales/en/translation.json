@@ -49,5 +49,63 @@
   "companionInfoBullet2": "The companion distance is an upper bound for the relative separation at any time (approximate; exact constraints require advanced solving).",
   "companionInfoBullet3": "The companion satellite is for simulation only and does not exist in public catalogs.",
   "companionInfoBullet4": "For richer control (phase, RAAN, argument of perigee), extend the monitoring module with advanced co-orbit solving.",
-  "companionInfoFooter": "Tip: You can share this page by copying the URL from the browser address bar."
+  "companionInfoFooter": "Tip: You can share this page by copying the URL from the browser address bar.",
+  
+  "nav": {
+    "about": "About",
+    "satelliteNews": "Satellite News",
+    "constellations": "Constellations",
+    "types": "Types",
+    "functions": "Functions",
+    "more": "More",
+    "share": "Share",
+    "search": "Search satellites",
+    "install": "Install"
+  },
+  
+  "legend": {
+    "inclination": "Inclination",
+    "equatorial": "Equatorial",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "retrograde": "Retrograde",
+    "distribution": "Distribution",
+    "satellites": "satellites"
+  },
+  
+  "toolbar": {
+    "home": "Home - Reset view",
+    "rotate": "Toggle auto-rotate",
+    "grid": "Toggle grid overlay",
+    "borders": "Toggle country borders",
+    "mapView": "Toggle 2D/3D view",
+    "satellites": "Toggle satellite labels",
+    "orbits": "Toggle orbit paths",
+    "sunlight": "Toggle day/night lighting",
+    "atmosphere": "Toggle atmosphere glow",
+    "groundStations": "Toggle ground stations",
+    "screenshot": "Take screenshot",
+    "clouds": "Toggle cloud layer",
+    "stars": "Toggle star background",
+    "record": "Record video"
+  },
+  
+  "welcome": {
+    "title": "Welcome",
+    "constellationData": "Constellation Data"
+  },
+  
+  "constellationMenu": {
+    "title": "Constellations",
+    "finder": "Finder",
+    "internet": "Internet",
+    "cellular": "Cellular",
+    "positioning": "Positioning",
+    "earthImaging": "Earth Imaging",
+    "weather": "Weather",
+    "science": "Science",
+    "iot": "IoT",
+    "quickSelect": "Quick Select"
+  }
 }

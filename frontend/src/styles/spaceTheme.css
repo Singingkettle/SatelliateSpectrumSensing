@@ -1,0 +1,736 @@
+/* Space Theme - Dark Space Aesthetic for Satellite Tracker
+ * Replicating satellitemap.space design
+ */
+
+/* ============ CSS Variables ============ */
+:root {
+  /* Primary backgrounds */
+  --bg-space: #0a0a0a;
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-panel: #0f172a;
+  --bg-panel-hover: #1e293b;
+  --bg-overlay: rgba(15, 15, 26, 0.95);
+  
+  /* Text colors */
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-accent: #1DA1F2;
+  
+  /* Accent colors */
+  --accent-blue: #1DA1F2;
+  --accent-green: #22c55e;
+  --accent-orange: #f97316;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+  
+  /* Border colors */
+  --border-color: #334155;
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-focus: #1DA1F2;
+  
+  /* Satellite inclination colors */
+  --sat-equatorial: #ef4444;     /* 0°-30° Red */
+  --sat-low: #f97316;            /* 30°-60° Orange */
+  --sat-medium: #eab308;         /* 60°-90° Yellow */
+  --sat-high: #22c55e;           /* 90°-120° Green */
+  --sat-retrograde: #3b82f6;     /* 120°-180° Blue */
+  
+  /* Globe styling */
+  --globe-grid: rgba(255, 140, 60, 0.15);
+  --globe-border: rgba(100, 140, 255, 0.3);
+  --orbit-path: rgba(255, 255, 255, 0.3);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+}
+
+/* ============ Base Styles ============ */
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-space);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text-primary);
+}
+
+/* ============ App Container ============ */
+.app-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-space);
+  position: relative;
+  overflow: hidden;
+}
+
+.app-layout {
+  min-height: 100vh;
+  background: var(--bg-space) !important;
+}
+
+.main-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-space);
+}
+
+/* ============ Globe Container ============ */
+.globe-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-space);
+}
+
+/* ============ Navigation Bar ============ */
+.nav-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: rgba(15, 15, 26, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 1000;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.nav-logo-icon {
+  width: 32px;
+  height: 32px;
+  animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 32px;
+}
+
+.nav-item {
+  padding: 8px 16px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-panel-hover);
+}
+
+.nav-item.active {
+  color: var(--accent-blue);
+  background: rgba(29, 161, 242, 0.1);
+}
+
+.nav-dropdown-icon {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.nav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-search-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nav-search-btn:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* ============ Dropdown Menu ============ */
+/* NOTE: Dropdown visibility is controlled by React conditional rendering in NavBar.jsx.
+   The styles in NavBar.css handle appearance. Do not add opacity/visibility overrides here. */
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-primary);
+}
+
+.dropdown-item-icon {
+  width: 20px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu > .dropdown-menu {
+  left: 100%;
+  top: 0;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 8px 0;
+}
+
+.dropdown-header {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============ Legend Panel (Right Sidebar) ============ */
+.legend-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 80px;
+  width: 220px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.legend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.legend-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.legend-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.legend-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.legend-nav-btn:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-primary);
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.legend-color-equatorial { background: var(--sat-equatorial); }
+.legend-color-low { background: var(--sat-low); }
+.legend-color-medium { background: var(--sat-medium); }
+.legend-color-high { background: var(--sat-high); }
+.legend-color-retrograde { background: var(--sat-retrograde); }
+
+.legend-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.legend-sublabel {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.legend-stats {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.legend-stat-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.legend-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.legend-stat-label {
+  color: var(--text-secondary);
+}
+
+.legend-stat-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ============ Bottom Toolbar ============ */
+/* Main styles are in BottomToolbar.css - these are CSS variable overrides only */
+
+/* ============ Time Controls ============ */
+/* Main styles are in TimeControls.css - these are CSS variable overrides only */
+
+/* ============ Constellation Name (Top Left) ============ */
+.constellation-label {
+  position: fixed;
+  top: 72px;
+  left: 20px;
+  font-size: 48px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.15);
+  letter-spacing: 2px;
+  text-transform: lowercase;
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============ Info Panel (Top Right) ============ */
+.info-panel {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  width: 300px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.info-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.info-panel-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.info-panel-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.info-panel-close:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-primary);
+}
+
+.info-panel-content {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.info-panel-link {
+  color: var(--accent-blue);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.info-panel-link:hover {
+  text-decoration: underline;
+}
+
+/* ============ Satellite Detail Panel ============ */
+.satellite-detail-panel {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  width: 360px;
+  max-height: calc(100vh - 180px);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.satellite-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.satellite-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--bg-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.satellite-info {
+  flex: 1;
+}
+
+.satellite-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.satellite-norad {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.satellite-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.satellite-close:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-primary);
+}
+
+.satellite-body {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.satellite-section {
+  margin-bottom: 20px;
+}
+
+.satellite-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.satellite-data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.satellite-data-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.satellite-data-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.satellite-data-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ============ Search Modal ============ */
+.search-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 100px;
+}
+
+.search-modal {
+  width: 600px;
+  max-width: 90%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.search-input-icon {
+  font-size: 20px;
+  color: var(--text-muted);
+  margin-right: 12px;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--bg-panel-hover);
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.search-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.search-results {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.search-result-item:hover {
+  background: var(--bg-panel-hover);
+}
+
+.search-result-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.search-result-info {
+  flex: 1;
+}
+
+.search-result-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.search-result-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.search-no-results {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ============ Loading Screen ============ */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--bg-space);
+  color: var(--text-primary);
+}
+
+.loading-screen p {
+  margin-top: 16px;
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+/* ============ Scrollbar ============ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ============ Cesium Overrides ============ */
+.cesium-viewer {
+  background: var(--bg-space) !important;
+}
+
+.cesium-viewer-bottom {
+  display: none !important;
+}
+
+.cesium-widget-credits {
+  display: none !important;
+}
+
+.cesium-viewer-animationContainer,
+.cesium-viewer-timelineContainer {
+  display: none !important;
+}

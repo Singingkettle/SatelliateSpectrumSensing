@@ -1,112 +1,243 @@
-# Satellite Internet Simulation Platform v3.1
+# ChangShuoSpace
 
-## 1. Overview
-This project is a modular simulation platform for LEO constellations (Starlink / OneWeb / Iridium) with a decoupled architecture:
-- Python backend (Flask) + MATLAB stateless engine for network/physical simulation
-- CesiumJS frontend for real‑time 3D/2D visualization, fully integrated and production‑ready
+Real-time satellite tracking and visualization platform. A comprehensive satellite tracker inspired by [satellitemap.space](https://satellitemap.space/), featuring support for Chinese satellite constellations including Qianfan (千帆), Guowang (国网), and GalaxySpace (银河航天).
 
-Key capabilities:
-- Frontend/Backend separation, clean API surface
-- Satellite orbit visualization with time‑evolving tracks (PathGraphics + SampledPositionProperty)
-- Day/Night earth lighting, atmosphere, sun/moon lighting
-- Interactive 2D/3D view toggle
-- Constellation and satellite selection (merged, compact UI)
-- Robust performance under thousands of satellites (render tuning)
-- Monitoring panel with Co‑orbiting companion satellite generation (simulated TLE)
-- Companion static info page `/companion/:id`
-- i18n status bar with Loaded, Orbit, Day/Night, View, and monitoring target id
+> **Project renamed from Satellite Tracker to ChangShuoSpace**
 
-Reference implementation for orbits and time‑evolving paths is inspired by satvis [Flowm/satvis](https://github.com/Flowm/satvis).
+## Features
 
-## 2. Architecture
+- **Real-time Satellite Tracking**: Track thousands of satellites in real-time on a 3D globe
+- **Multi-Constellation Support**: Starlink, GPS, OneWeb, Iridium, Galileo, GLONASS, BeiDou, and more
+- **Satellite Search**: Search satellites by name or NORAD ID
+- **Detailed Information**: View orbital parameters, TLE data, and satellite metadata
+- **Orbit Prediction**: Calculate and visualize satellite orbit paths
+- **Orbital Decay Analysis**: Track satellite altitude changes over time
+- **Ground Station Display**: View ground station locations for various constellations
+- **Pass Predictions**: Predict when satellites will pass over a location
+
+## Architecture
+
 ```
-┌────────────────┐  HTTP/WebSocket  ┌──────────────────┐  MATLAB Engine API  ┌──────────────────┐
-│   Frontend     │ <--------------> │   Python Backend │ <-----------------> │      MATLAB      │
-│  (CesiumJS)    │                  │     (Flask)      │                    │  (Core Models)   │
-└────────────────┘                  └──────────────────┘                    └──────────────────┘
-        ▲                                       │                                   │
-        │                                       ▼                                   ▼
-        │                               ┌──────────────────┐                 ┌──────────────────┐
-        └───────────────────────────────│   Redis Cache    │                 │  MATLAB Codebase  │
-                                        │ (TLE, IQ, etc.) │                 │ (+physical,+network) │
-                                        └──────────────────┘                 └──────────────────┘
+┌─────────────────┐     HTTP/REST      ┌─────────────────┐
+│    Frontend     │ <----------------> │     Backend     │
+│  (React/Cesium) │                    │    (Flask)      │
+└─────────────────┘                    └─────────────────┘
+        │                                      │
+        │ satellite.js                         │
+        │ (orbit calc)                         ▼
+        ▼                              ┌─────────────────┐
+┌─────────────────┐                    │   PostgreSQL    │
+│  3D Globe View  │                    │   + Redis       │
+└─────────────────┘                    └─────────────────┘
+                                               │
+                                               ▼
+                                       ┌─────────────────┐
+                                       │   CelesTrak     │
+                                       │   (TLE Data)    │
+                                       └─────────────────┘
 ```
 
-## 3. Frontend
-The frontend is a CesiumJS application with the following features:
-- Time‑evolving orbit tracks using PathGraphics + SampledPositionProperty (satvis‑style)
-- Constellation/Satellite selection merged into a single "Satellites" panel
-- Monitoring panel with Co‑orbiting (companion) controls
-- Day/Night lighting toggle (atmosphere + sun/moon + globe lighting)
-- View mode toggle (2D / 3D)
-- Request‑on‑demand rendering and scene tuning for performance (30 FPS cap while animating)
+## Tech Stack
 
-### 3.1 Run (Development)
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 19, CesiumJS, Resium, Ant Design, Zustand |
+| 3D Visualization | CesiumJS 1.131, WebGL |
+| Orbit Calculation | satellite.js (browser), sgp4 (server) |
+| Backend | Flask 3.0, SQLAlchemy, Flask-Migrate |
+| Database | PostgreSQL 16 |
+| Cache | Redis |
+| Scheduler | APScheduler |
+
+## Prerequisites
+
+- Node.js 18+
+- Python 3.11+
+- PostgreSQL 16+
+- Redis
+
+## Quick Start
+
+### 1. Database Setup
+
+```bash
+# Create PostgreSQL database
+psql -U postgres
+CREATE DATABASE satellite_tracker;
+\q
 ```
+
+### 2. Backend Setup
+
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows)
+.\venv\Scripts\activate
+
+# Activate (Linux/Mac)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Initialize database and load TLE data
+python init_db.py --all
+
+# Start backend server
+python app.py
+```
+
+Backend runs at `http://localhost:6359`
+
+### 3. Frontend Setup
+
+```bash
 cd frontend
-npm install
-npm run start
-```
-The dev server runs on http://localhost:3000
 
-### 3.2 Build
+# Install dependencies
+npm install
+
+# Start development server
+npm start
 ```
+
+Frontend runs at `http://localhost:3000`
+
+### 4. Quick Start Script (Windows)
+
+```powershell
+.\scripts\start.ps1
+```
+
+## API Endpoints
+
+### Constellations
+- `GET /api/constellations` - List all constellations
+- `GET /api/constellations/<slug>` - Get constellation details
+- `GET /api/constellations/<slug>/satellites` - Get satellites in constellation
+- `GET /api/constellations/<slug>/tle` - Get TLE data for constellation
+- `POST /api/constellations/<slug>/update` - Update TLE data from CelesTrak
+
+### Satellites
+- `GET /api/satellites` - List satellites (with filtering)
+- `GET /api/satellites/search?q=<query>` - Search satellites
+- `GET /api/satellites/<norad_id>` - Get satellite details
+- `GET /api/satellites/<norad_id>/tle` - Get satellite TLE
+- `GET /api/satellites/<norad_id>/position` - Get current position
+- `GET /api/satellites/<norad_id>/orbit` - Get orbit track
+- `GET /api/satellites/<norad_id>/history` - Get TLE history
+- `GET /api/satellites/<norad_id>/passes` - Predict passes
+
+### Ground Stations
+- `GET /api/ground-stations` - List ground stations
+- `POST /api/ground-stations` - Create ground station
+- `POST /api/ground-stations/seed-starlink` - Seed Starlink stations
+
+## Supported Constellations
+
+### Internet/Communication
+| Constellation | Satellites | Description |
+|--------------|------------|-------------|
+| Starlink | ~7000+ | SpaceX satellite internet |
+| OneWeb | ~600+ | Global broadband |
+| Kuiper | Growing | Amazon satellite internet |
+| Qianfan (千帆) | Growing | Chinese satellite internet (G60 Starlink) |
+| Guowang (国网) | Growing | Chinese SatNet constellation |
+| GalaxySpace (银河航天) | Growing | Chinese satellite internet |
+| E-Space | Growing | LEO satellite constellation |
+
+### Navigation
+| Constellation | Satellites | Description |
+|--------------|------------|-------------|
+| GPS | ~31 | US navigation |
+| GLONASS | ~24 | Russian navigation |
+| Galileo | ~28 | European navigation |
+| BeiDou | ~50+ | Chinese navigation |
+
+### Communication
+| Constellation | Satellites | Description |
+|--------------|------------|-------------|
+| Iridium NEXT | ~75 | Voice and data |
+| Globalstar | ~48 | Mobile satellite |
+| Bluewalker (AST) | Growing | Direct-to-cell |
+
+### Earth Observation
+| Constellation | Satellites | Description |
+|--------------|------------|-------------|
+| Planet | ~200+ | Earth observation |
+| Spire | ~100+ | Weather/AIS |
+| Jilin-1 (吉林一号) | ~100+ | Chinese Earth imaging |
+
+## Development
+
+### Backend Development
+
+```bash
+cd backend
+.\venv\Scripts\activate
+
+# Run with debug mode
+FLASK_ENV=development python app.py
+
+# Run database migrations
+flask db migrate -m "Description"
+flask db upgrade
+```
+
+### Frontend Development
+
+```bash
+cd frontend
+
+# Development server with hot reload
+npm start
+
+# Build for production
 npm run build
 ```
 
-### 3.3 UX Controls
-- Satellites panel: select constellations, pick satellites (tabs), pagination supports up to 1000 per page
-- Monitoring panel: pick strategy, target from selected satellites, and companion distance
-- Display panel:
-  - Orbit: on/off (show/hide PathGraphics tracks)
-  - Day/Night: on/off (globe.enableLighting, sun/moon, atmosphere)
-  - View: 2D / 3D (scene.morphTo2D / morphTo3D)
-- Status bar (top‑right): displays Loaded (includes companion), Orbit, Day/Night, View, Monitoring target id (i18n)
+## Configuration
 
-### 3.4 Scene & Lighting (what we enable)
-- skyAtmosphere.show = true
-- scene.sun = new Cesium.Sun(); scene.sun.show = true
-- scene.moon = new Cesium.Moon(); scene.moon.show = true
-- scene.light = new Cesium.SunLight()
-- globe.enableLighting follows UI toggle
-- requestRenderMode = true, maximumRenderTimeChange = 1/30
+### Backend Configuration
 
-For the time‑evolving orbit technique see satvis [Flowm/satvis](https://github.com/Flowm/satvis).
+Environment variables (or edit `config.py`):
 
-## 4. Backend
-Python + Flask provides:
-- REST endpoints for constellation list and TLE retrieval (with Redis cache)
-- Snapshot‑driven calls into MATLAB for network/physical simulations
-
-### 4.1 Install & Run
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/satellite_tracker
+REDIS_HOST=localhost
+REDIS_PORT=6379
+SECRET_KEY=your-secret-key
 ```
-cd backend/python_backend
-python -m venv env
-# Windows
-./env/Scripts/activate
-pip install -r requirements.txt  # or see README section for packages
-python app.py  # runs on http://localhost:5002
+
+### Frontend Configuration
+
+Create `frontend/.env.development`:
+
 ```
-Redis must be available on 6379.
+REACT_APP_API_BASE_URL=http://localhost:6359/api
+```
 
-## 5. API (excerpt)
-- GET /api/constellations → supported constellations
-- GET /api/tle/<constellation> → TLE array for a constellation
-- POST /api/simulation/start → execute snapshot analysis (see doc)
+## Data Sources
 
-## 6. MATLAB Codebase
-Refactored three‑layer structure:
-- +physical: channel, signal, link budget
-- +network: link managers for each constellation
-- +interface: top‑level entry points
+TLE data is fetched from multiple sources using a multi-source strategy:
 
-## 7. Documentation
-- Python Backend Design: `doc/python_backend_design.md`
-- Orbit Visualization Guide: `doc/orbit_visualization_guide.md`
-  - Explains time‑evolving tracks (PathGraphics), companion TLE, lighting & view toggles, performance notes
-- Fixes & Notes: `doc/frontend_fixes_summary.md`
+1. **api2.satellitemap.space** - Real-time proxy with comprehensive data
+2. **Space-Track.org** - Primary authoritative source (requires account)
+3. **CelesTrak** - Backup mirror, updated daily
 
-## 8. Notes
-- Lighting is a 3D feature; in 2D mode day/night visuals are limited by Cesium capabilities
-- If lighting looks subtle, try increasing `clock.multiplier` to see the terminator move faster
-- All old primitive/worker‑based orbit code has been removed in favor of the satvis approach
+Ground station locations are community-sourced.
+
+## License
+
+MIT License
+
+## Acknowledgments
+
+- [satellitemap.space](https://satellitemap.space/) - Inspiration
+- [CelesTrak](https://celestrak.org/) - TLE data provider
+- [satellite.js](https://github.com/shashwatak/satellite-js) - Orbit calculation
+- [CesiumJS](https://cesium.com/) - 3D globe visualization

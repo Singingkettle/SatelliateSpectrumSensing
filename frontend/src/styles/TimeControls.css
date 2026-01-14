@@ -1,0 +1,115 @@
+/* Time Controls Styles */
+/* Independent small panel at bottom-right, matching BottomToolbar style */
+
+.time-controls {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(10, 10, 15, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 14px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Time Display */
+.time-display {
+  font-family: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 14px;
+  color: #1DA1F2;
+  letter-spacing: 0.5px;
+}
+
+.time-date {
+  color: #1DA1F2;
+}
+
+.time-separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.time-clock {
+  color: #1DA1F2;
+  font-weight: 500;
+}
+
+.time-zone {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.time-speed {
+  color: #f97316;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: rgba(249, 115, 22, 0.15);
+  border-radius: 4px;
+}
+
+.time-btn.paused {
+  color: #f97316;
+}
+
+/* Playback Controls */
+.time-playback {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.time-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.time-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.time-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.time-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .time-controls {
+    bottom: 8px;
+    right: 8px;
+    padding: 6px 12px;
+    gap: 12px;
+  }
+  
+  .time-display {
+    font-size: 12px;
+  }
+  
+  .time-btn {
+    width: 24px;
+    height: 24px;
+  }
+}

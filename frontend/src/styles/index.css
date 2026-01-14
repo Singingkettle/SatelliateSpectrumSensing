@@ -1,13 +1,366 @@
-body {
+/* Global styles for Satellite Tracker - Dark Space Theme
+ * Matching satellitemap.space aesthetic
+ */
+
+@import './spaceTheme.css';
+
+* {
+  box-sizing: border-box;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a0a;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #ffffff;
+}
+
+/* ============ App Layout ============ */
+.app-layout {
+  min-height: 100vh;
+  background: #0a0a0a !important;
+}
+
+.main-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #0a0a0a;
+}
+
+/* ============ Loading Screen ============ */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #0a0a0a;
+  color: #fff;
+}
+
+.loading-screen p {
+  margin-top: 16px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ============ Scrollbar Styling ============ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ============ Ant Design Dark Theme Overrides ============ */
+.ant-layout {
+  background: #0a0a0a !important;
+}
+
+.ant-layout-sider {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(12px);
+}
+
+.ant-menu {
+  background: transparent !important;
+}
+
+.ant-menu-item {
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-radius: 6px !important;
+  margin: 2px 8px !important;
+}
+
+.ant-menu-item:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-menu-item-selected {
+  background: rgba(29, 161, 242, 0.2) !important;
+  color: #1DA1F2 !important;
+}
+
+.ant-card {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+}
+
+.ant-card-head {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-card-body {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.ant-descriptions-item-label {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.ant-descriptions-item-content {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-divider {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-divider-inner-text {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.ant-input {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  border-radius: 8px !important;
+}
+
+.ant-input:hover {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.ant-input:focus {
+  border-color: #1DA1F2 !important;
+  box-shadow: 0 0 0 2px rgba(29, 161, 242, 0.2) !important;
+}
+
+.ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.ant-input-affix-wrapper {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+}
+
+.ant-input-affix-wrapper-focused {
+  border-color: #1DA1F2 !important;
+}
+
+.ant-list-item {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  padding: 12px 0 !important;
+}
+
+.ant-switch {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ant-switch-checked {
+  background: #1DA1F2 !important;
+}
+
+.ant-btn {
+  border-radius: 6px !important;
+}
+
+.ant-btn-primary {
+  background: #1DA1F2 !important;
+  border-color: #1DA1F2 !important;
+}
+
+.ant-btn-primary:hover {
+  background: #1a91da !important;
+  border-color: #1a91da !important;
+}
+
+.ant-btn-text {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.ant-btn-text:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-btn-default {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.ant-btn-default:hover {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  color: #fff !important;
+}
+
+.ant-spin-dot-item {
+  background-color: #1DA1F2 !important;
+}
+
+.ant-checkbox-wrapper {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.ant-checkbox-inner {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background: #1DA1F2 !important;
+  border-color: #1DA1F2 !important;
+}
+
+.ant-select-selector {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-select-dropdown {
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-select-item {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.ant-select-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-select-item-option-selected {
+  background: rgba(29, 161, 242, 0.2) !important;
+}
+
+.ant-modal-content {
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+}
+
+.ant-modal-header {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-modal-title {
+  color: #ffffff !important;
+}
+
+.ant-modal-close {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.ant-modal-close:hover {
+  color: #ffffff !important;
+}
+
+.ant-tooltip-inner {
+  background: #1e293b !important;
+  border-radius: 6px !important;
+}
+
+.ant-tabs-tab {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.ant-tabs-tab:hover {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #1DA1F2 !important;
+}
+
+.ant-tabs-ink-bar {
+  background: #1DA1F2 !important;
+}
+
+.ant-collapse {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-collapse-item {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-collapse-header {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-collapse-content {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-badge-count {
+  background: #1DA1F2 !important;
+}
+
+.ant-tag {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 4px !important;
+}
+
+/* ============ Animation Classes ============ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { 
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-slideInUp {
+  animation: slideInUp 0.3s ease-out;
 }

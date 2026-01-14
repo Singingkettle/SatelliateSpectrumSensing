@@ -1,0 +1,24 @@
+/* Constellation Label Styles */
+
+.constellation-label {
+  position: fixed;
+  top: 80px;
+  left: 24px;
+  font-size: 48px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.08);
+  letter-spacing: 3px;
+  text-transform: lowercase;
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+@media (max-width: 768px) {
+  .constellation-label {
+    font-size: 32px;
+    top: 70px;
+    left: 16px;
+  }
+}

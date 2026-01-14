@@ -49,5 +49,70 @@
   "companionInfoBullet2": "伴飞距离表示任意时刻的最大相对距离不应超过该值（近似处理，精确约束可通过高级解算增强）。",
   "companionInfoBullet3": "伴飞卫星仅用于仿真演示，并不存在于真实星历目录中。",
   "companionInfoBullet4": "如需更详尽的参数设定（相位、升交点、本初近地点等），可在监测模块扩展高级伴飞解算。",
-  "companionInfoFooter": "提示：可从浏览器地址栏复制本链接，分享该伴飞场景说明页面。"
+  "companionInfoFooter": "提示：可从浏览器地址栏复制本链接，分享该伴飞场景说明页面。",
+  
+  "nav": {
+    "about": "关于",
+    "satelliteNews": "卫星新闻",
+    "constellations": "星座",
+    "types": "类型",
+    "functions": "功能",
+    "more": "更多",
+    "share": "分享",
+    "search": "搜索卫星",
+    "install": "安装"
+  },
+  
+  "legend": {
+    "inclination": "倾角",
+    "equatorial": "赤道",
+    "low": "低倾角",
+    "medium": "中倾角",
+    "high": "高倾角",
+    "retrograde": "逆行",
+    "distribution": "分布",
+    "satellites": "颗卫星"
+  },
+  
+  "toolbar": {
+    "home": "主页 - 重置视图",
+    "rotate": "自动旋转",
+    "grid": "网格线",
+    "borders": "国家边界",
+    "mapView": "2D/3D视图",
+    "satellites": "卫星标签",
+    "orbits": "轨道路径",
+    "sunlight": "日照/昼夜",
+    "atmosphere": "大气光晕",
+    "groundStations": "地面站",
+    "screenshot": "截图",
+    "clouds": "云层",
+    "stars": "星空背景",
+    "record": "录制视频"
+  },
+  
+  "welcome": {
+    "title": "欢迎",
+    "constellationData": "星座数据"
+  },
+  
+  "constellationMenu": {
+    "title": "星座",
+    "finder": "查找器",
+    "internet": "互联网",
+    "cellular": "蜂窝网络",
+    "positioning": "定位",
+    "earthImaging": "地球成像",
+    "weather": "气象",
+    "science": "科学",
+    "iot": "物联网",
+    "quickSelect": "快速选择",
+    "Internet": "互联网",
+    "Cellular": "蜂窝网络",
+    "Positioning": "定位导航",
+    "Earth Imaging": "地球成像",
+    "Weather": "气象",
+    "Science": "科学",
+    "IoT": "物联网"
+  }
 }

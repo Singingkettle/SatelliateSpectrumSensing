@@ -1,15 +1,190 @@
-/* CesiumViewer.css */
-.viewer-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+/* Cesium Viewer Dark Space Theme
+ * Styled to match satellitemap.space aesthetic
+ */
+
+/* ============ Globe Wrapper ============ */
+.globe-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0a0a0a;
 }
 
-/* Ensure Cesium bottom UI respects left margin 0 (panel no longer covers bottom area) */
-.cesium-viewer .cesium-viewer-bottom,
-.cesium-viewer .cesium-viewer-timelineContainer,
-.cesium-viewer .cesium-viewer-animationContainer {
-    left: 0;
+/* ============ Cesium Viewer ============ */
+.cesium-viewer-dark {
+  width: 100%;
+  height: 100%;
+  background: #0a0a0a !important;
+}
+
+.cesium-viewer-dark .cesium-widget {
+  background: #0a0a0a !important;
+}
+
+.cesium-viewer-dark .cesium-widget canvas {
+  background: #0a0a0a !important;
+}
+
+/* ============ Hide Default UI Elements ============ */
+.cesium-viewer-bottom {
+  display: none !important;
+}
+
+.cesium-viewer-animationContainer,
+.cesium-viewer-timelineContainer {
+  display: none !important;
+}
+
+.cesium-widget-credits {
+  display: none !important;
+}
+
+.cesium-viewer .cesium-widget-credits {
+  display: none !important;
+}
+
+/* Hide navigation help */
+.cesium-navigationHelpButton-wrapper {
+  display: none !important;
+}
+
+/* Hide fullscreen button */
+.cesium-viewer-fullscreenContainer {
+  display: none !important;
+}
+
+/* Hide VR button */
+.cesium-viewer-vrContainer {
+  display: none !important;
+}
+
+/* ============ Selection Indicator ============ */
+.cesium-selection-wrapper {
+  pointer-events: none;
+}
+
+.cesium-selection-wrapper .cesium-selection-wrapper[data-selected=true] {
+  border-color: #1DA1F2;
+}
+
+/* Custom selection indicator */
+.cesium-viewer .cesium-selection {
+  border-color: rgba(29, 161, 242, 0.5) !important;
+  background: rgba(29, 161, 242, 0.1) !important;
+}
+
+/* ============ InfoBox Styling (if enabled) ============ */
+.cesium-infoBox {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(12px);
+}
+
+.cesium-infoBox-title {
+  background: transparent !important;
+  color: #ffffff !important;
+}
+
+.cesium-infoBox-description {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.cesium-infoBox-close {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.cesium-infoBox-close:hover {
+  color: #ffffff !important;
+}
+
+/* ============ Toolbar (if enabled) ============ */
+.cesium-viewer-toolbar {
+  display: none !important;
+}
+
+/* ============ Credit Display (hidden) ============ */
+.cesium-credit-logoContainer,
+.cesium-credit-delimiter,
+.cesium-credit-text {
+  display: none !important;
+}
+
+/* ============ Performance Monitor (debug) ============ */
+.cesium-performanceDisplay-defaultContainer {
+  display: none !important;
+}
+
+/* ============ Entity Label Styling ============ */
+.cesium-viewer .cesium-selection {
+  border-radius: 4px;
+  border: 2px solid #1DA1F2;
+  box-shadow: 0 0 20px rgba(29, 161, 242, 0.3);
+}
+
+/* ============ Cesium Canvas Cursor ============ */
+.cesium-viewer canvas {
+  cursor: grab;
+}
+
+.cesium-viewer canvas:active {
+  cursor: grabbing;
+}
+
+/* ============ Animation Widgets (hidden) ============ */
+.cesium-viewer-animationContainer {
+  display: none !important;
+}
+
+.cesium-viewer-timelineContainer {
+  display: none !important;
+}
+
+/* ============ Loading Overlay ============ */
+.cesium-widget > .cesium-widget-errorPanel {
+  background: rgba(15, 15, 26, 0.95) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-radius: 12px !important;
+}
+
+.cesium-widget-errorPanel-title {
+  color: #ef4444 !important;
+}
+
+.cesium-widget-errorPanel-message {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* ============ Globe Grid Effect ============ */
+/* Note: Actual grid is rendered via Cesium primitives */
+
+/* ============ Atmosphere Glow ============ */
+/* Controlled via Cesium skyAtmosphere settings */
+
+/* ============ Responsive Adjustments ============ */
+@media (max-width: 768px) {
+  .cesium-viewer canvas {
+    touch-action: none;
+  }
+}
+
+/* ============ High DPI Adjustments ============ */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .cesium-viewer canvas {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* ============ Viewer Container ============ */
+.viewer-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
