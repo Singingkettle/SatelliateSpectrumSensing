@@ -76,20 +76,17 @@ const CONSTELLATION_HIERARCHY = {
   },
 };
 
-const ConstellationMenuItem = ({ item, onSelect, t }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const ConstellationMenuItem = ({ item, onSelect, t, isOpen, onToggle }) => {
   const selectedConstellations = useSatelliteStore(s => s.selectedConstellations);
   const loadingConstellations = useSatelliteStore(s => s.loadingConstellations);
   
   const handleClick = (e) => {
     e.stopPropagation();
     if (item.children) {
-      setIsOpen(!isOpen);
+      // Toggle this submenu, parent will close others
+      onToggle(item.name);
     } else if (item.slug) {
       onSelect(item.slug);
-      // Ensure dropdown closes by deferring the close action slightly 
-      // to let React state updates propagate
-      // But onSelect already calls toggleConstellation and then onClose
     }
   };
   
@@ -103,7 +100,7 @@ const ConstellationMenuItem = ({ item, onSelect, t }) => {
     <div className="dropdown-submenu" role="menuitem">
       <button 
         type="button"
-        className={`dropdown-item ${isSelected ? 'selected' : ''}`}
+        className={`dropdown-item ${isSelected ? 'selected' : ''} ${isOpen ? 'active' : ''}`}
         onClick={handleClick}
         aria-expanded={item.children ? isOpen : undefined}
         aria-haspopup={item.children ? 'menu' : undefined}
@@ -130,6 +127,8 @@ const ConstellationMenuItem = ({ item, onSelect, t }) => {
               item={child} 
               onSelect={onSelect}
               t={t}
+              isOpen={false}
+              onToggle={() => {}}
             />
           ))}
         </div>
@@ -141,6 +140,14 @@ const ConstellationMenuItem = ({ item, onSelect, t }) => {
 const ConstellationMenu = ({ onClose }) => {
   const { t } = useTranslation();
   const toggleConstellation = useSatelliteStore(s => s.toggleConstellation);
+  
+  // Single state to track which submenu is open (only one at a time)
+  const [openSubmenu, setOpenSubmenu] = useState(null);
+  
+  const handleToggleSubmenu = (menuName) => {
+    // If clicking the same menu, close it; otherwise open the new one
+    setOpenSubmenu(prev => prev === menuName ? null : menuName);
+  };
   
   const handleSelect = (slug) => {
     toggleConstellation(slug);
@@ -177,6 +184,8 @@ const ConstellationMenu = ({ onClose }) => {
           item={category}
           onSelect={handleSelect}
           t={t}
+          isOpen={openSubmenu === category.name}
+          onToggle={handleToggleSubmenu}
         />
       ))}
       
@@ -191,6 +200,8 @@ const ConstellationMenu = ({ onClose }) => {
         const item = items[0];
         if (!item) return null;
         
+        const displayName = t(`constellationMenu.${item.name}`, item.name);
+        
         return (
           <button 
             key={slug}
@@ -203,7 +214,7 @@ const ConstellationMenu = ({ onClose }) => {
               className="constellation-color-dot"
               style={{ backgroundColor: item.color }}
             />
-            <span>{item.name}</span>
+            <span>{displayName}</span>
           </button>
         );
       })}

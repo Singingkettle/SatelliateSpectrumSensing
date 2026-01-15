@@ -11,6 +11,9 @@ const FunctionsMenu = ({ onClose }) => {
   const setShowConstellationData = useUiStore(s => s.setShowConstellationData);
   const setShowCalculatorModal = useUiStore(s => s.setShowCalculatorModal);
   
+  // Single state to track which submenu is open (only one at a time)
+  const [openSubmenu, setOpenSubmenu] = useState(null);
+  
   // Function items with translation keys
   const FUNCTION_ITEMS = [
     { 
@@ -22,6 +25,7 @@ const FunctionsMenu = ({ onClose }) => {
     {
       nameKey: 'functions.visualizer',
       icon: '👁️',
+      menuId: 'visualizer',
       children: [
         { nameKey: 'functions.load', slug: 'visualizer-load' },
         { nameKey: 'functions.clear', slug: 'visualizer-clear' },
@@ -33,6 +37,7 @@ const FunctionsMenu = ({ onClose }) => {
     {
       nameKey: 'functions.bookmarks',
       icon: '⭐',
+      menuId: 'bookmarks',
       children: [
         { name: 'ISS', slug: 'bookmark-iss', noradId: 25544 },
         { name: 'CSS', slug: 'bookmark-css', noradId: 48274 },
@@ -42,6 +47,7 @@ const FunctionsMenu = ({ onClose }) => {
     {
       nameKey: 'functions.calculator',
       icon: '🧮',
+      menuId: 'calculator',
       children: [
         { nameKey: 'functions.train', slug: 'calc-train', icon: '🚂' },
         { nameKey: 'functions.transit', slug: 'calc-transit', icon: '🔀' },
@@ -55,6 +61,11 @@ const FunctionsMenu = ({ onClose }) => {
     { nameKey: 'functions.photoSimulator', slug: 'photo-simulator', icon: '📷' },
     { nameKey: 'functions.conjunctionSearch', slug: 'conjunction-search', icon: '🔀' },
   ];
+  
+  const handleToggleSubmenu = (menuId) => {
+    // If clicking the same menu, close it; otherwise open the new one
+    setOpenSubmenu(prev => prev === menuId ? null : menuId);
+  };
   
   const handleSelect = (item) => {
     switch (item.slug) {
@@ -107,23 +118,24 @@ const FunctionsMenu = ({ onClose }) => {
       
       {FUNCTION_ITEMS.map((item) => (
         <FunctionMenuItem 
-          key={item.nameKey || item.name}
+          key={item.menuId || item.nameKey || item.name}
           item={item}
           onSelect={handleSelect}
           t={t}
+          isOpen={openSubmenu === item.menuId}
+          onToggle={handleToggleSubmenu}
         />
       ))}
     </div>
   );
 };
 
-const FunctionMenuItem = ({ item, onSelect, t }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  
+const FunctionMenuItem = ({ item, onSelect, t, isOpen, onToggle }) => {
   const handleClick = (e) => {
     e.stopPropagation();
-    if (item.children) {
-      setIsOpen(!isOpen);
+    if (item.children && item.menuId) {
+      // Toggle submenu via parent
+      onToggle(item.menuId);
     } else if (item.slug) {
       onSelect(item);
     }
@@ -134,7 +146,7 @@ const FunctionMenuItem = ({ item, onSelect, t }) => {
   return (
     <div className="dropdown-submenu">
       <div 
-        className="dropdown-item"
+        className={`dropdown-item ${isOpen ? 'active' : ''}`}
         onClick={handleClick}
       >
         {item.icon && <span className="dropdown-item-icon">{item.icon}</span>}

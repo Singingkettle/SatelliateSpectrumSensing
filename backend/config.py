@@ -19,11 +19,29 @@ class Config:
     )
     # For PostgreSQL: 'postgresql://postgres:postgres@localhost:5432/satellite_tracker'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 10,
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-    }
+    
+    # Engine options - different for SQLite vs PostgreSQL
+    @staticmethod
+    def get_engine_options():
+        db_uri = os.environ.get('DATABASE_URL', 'sqlite:///satellite_tracker.db')
+        if db_uri.startswith('sqlite'):
+            # SQLite specific options for better concurrency
+            return {
+                'connect_args': {
+                    'timeout': 30,  # Wait up to 30 seconds for lock
+                    'check_same_thread': False,  # Allow multi-threaded access
+                },
+                'pool_pre_ping': True,
+            }
+        else:
+            # PostgreSQL / other databases
+            return {
+                'pool_size': 10,
+                'pool_recycle': 300,
+                'pool_pre_ping': True,
+            }
+    
+    SQLALCHEMY_ENGINE_OPTIONS = None  # Will be set dynamically
     
     # TLE Cache settings (used for SQLite-based caching)
     TLE_CACHE_EXPIRY = int(os.environ.get('TLE_CACHE_EXPIRY', 86400))  # 24 hours

@@ -475,6 +475,7 @@ const CesiumGlobe = () => {
     };
     
     // Handle Earth rotation toggle (slow auto-spin of globe)
+    // This rotates the camera around the Earth's center (not just changing heading)
     const handleToggleEarthRotation = () => {
       const viewer = viewerRef.current?.cesiumElement;
       if (!viewer) return;
@@ -485,10 +486,48 @@ const CesiumGlobe = () => {
         clearInterval(autoRotateRef.current);
         autoRotateRef.current = null;
       } else {
-        // Not rotating - start slow rotation
-        const rotateAmount = 0.1; // degrees per frame (slow rotation)
+        // Not rotating - start slow rotation around Earth's axis
+        const rotateAmount = Cesium.Math.toRadians(0.15); // radians per frame (slow rotation)
+        
         autoRotateRef.current = setInterval(() => {
-          viewer.camera.rotateRight(Cesium.Math.toRadians(rotateAmount / 60));
+          if (!viewer || viewer.isDestroyed()) {
+            clearInterval(autoRotateRef.current);
+            autoRotateRef.current = null;
+            return;
+          }
+          
+          // Get camera position
+          const cameraPosition = viewer.camera.position.clone();
+          const cameraDirection = viewer.camera.direction.clone();
+          const cameraUp = viewer.camera.up.clone();
+          
+          // Create rotation matrix around Earth's Z axis (spin axis)
+          const rotationMatrix = Cesium.Matrix3.fromRotationZ(rotateAmount);
+          
+          // Rotate camera position around Earth center
+          const newPosition = Cesium.Matrix3.multiplyByVector(
+            rotationMatrix, 
+            cameraPosition, 
+            new Cesium.Cartesian3()
+          );
+          
+          // Rotate camera direction and up vectors
+          const newDirection = Cesium.Matrix3.multiplyByVector(
+            rotationMatrix,
+            cameraDirection,
+            new Cesium.Cartesian3()
+          );
+          const newUp = Cesium.Matrix3.multiplyByVector(
+            rotationMatrix,
+            cameraUp,
+            new Cesium.Cartesian3()
+          );
+          
+          // Apply new camera orientation
+          viewer.camera.position = newPosition;
+          viewer.camera.direction = newDirection;
+          viewer.camera.up = newUp;
+          
           viewer.scene.requestRender();
         }, 16); // ~60fps
       }

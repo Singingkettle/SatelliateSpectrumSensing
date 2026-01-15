@@ -28,9 +28,25 @@ def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
     
+    # Set dynamic engine options based on database type
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = config[config_name].get_engine_options()
+    
     # Initialize extensions
     db.init_app(app)
     Migrate(app, db)
+    
+    # Enable SQLite WAL mode for better concurrency
+    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+        with app.app_context():
+            from sqlalchemy import text
+            try:
+                db.session.execute(text('PRAGMA journal_mode=WAL'))
+                db.session.execute(text('PRAGMA synchronous=NORMAL'))
+                db.session.execute(text('PRAGMA busy_timeout=30000'))
+                db.session.commit()
+                app.logger.info('SQLite WAL mode enabled for better concurrency')
+            except Exception as e:
+                app.logger.warning(f'Could not enable WAL mode: {e}')
     
     # Enable CORS
     CORS(app, resources={
