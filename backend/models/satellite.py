@@ -15,6 +15,7 @@ class Satellite(db.Model):
     norad_id = db.Column(db.Integer, unique=True, nullable=False, index=True)
     name = db.Column(db.String(100), nullable=False, index=True)
     constellation_id = db.Column(db.Integer, db.ForeignKey('constellations.id'), index=True)
+    launch_id = db.Column(db.Integer, db.ForeignKey('launches.id'), index=True, nullable=True)
     
     # TLE Data
     tle_line1 = db.Column(db.String(70))

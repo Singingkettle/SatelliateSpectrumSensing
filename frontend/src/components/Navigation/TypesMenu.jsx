@@ -4,54 +4,55 @@
  * Filters satellites by category/purpose
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSatelliteStore } from '../../store/satelliteStore';
 
 // Type categories that map to constellation groups
 const SATELLITE_TYPES = [
   { 
-    name: 'Internet', 
+    nameKey: 'types.internet',
     slug: 'internet', 
     icon: '🌐',
     constellations: ['starlink', 'oneweb', 'kuiper', 'qianfan', 'guowang', 'galaxyspace', 'espace']
   },
   { 
-    name: 'Communications', 
+    nameKey: 'types.communications',
     slug: 'communications', 
     icon: '📡',
     constellations: ['iridium', 'globalstar', 'orbcomm', 'bluewalker', 'lynk']
   },
   { 
-    name: 'Global Positioning', 
+    nameKey: 'types.globalPositioning',
     slug: 'positioning', 
     icon: '📍',
     constellations: ['gps', 'glonass', 'galileo', 'beidou']
   },
   { 
-    name: 'Earth Imaging', 
+    nameKey: 'types.earthImaging',
     slug: 'earth-imaging', 
     icon: '🛰️',
     constellations: ['planet', 'spire', 'jilin', 'yaogan']
   },
   { 
-    name: 'Geostationary', 
+    nameKey: 'types.geostationary',
     slug: 'geostationary', 
     icon: '🔴',
     constellations: ['geo', 'intelsat', 'ses']
   },
   { 
-    name: 'Space Stations', 
+    nameKey: 'types.spaceStations',
     slug: 'stations', 
     icon: '🏠',
     constellations: ['stations']
   },
   { 
-    name: 'All Active', 
+    nameKey: 'types.allActive',
     slug: 'active', 
     icon: '✅',
     constellations: ['active']
   },
   { 
-    name: 'Recent Launches', 
+    nameKey: 'types.recentLaunches',
     slug: 'recent', 
     icon: '🚀',
     constellations: ['last-30-days']
@@ -59,6 +60,7 @@ const SATELLITE_TYPES = [
 ];
 
 const TypesMenu = ({ onClose }) => {
+  const { t } = useTranslation();
   const toggleConstellation = useSatelliteStore(s => s.toggleConstellation);
   const loadConstellation = useSatelliteStore(s => s.loadConstellation);
   const selectedConstellations = useSatelliteStore(s => s.selectedConstellations);
@@ -85,7 +87,7 @@ const TypesMenu = ({ onClose }) => {
   
   return (
     <div className="dropdown-menu types-menu">
-      <div className="dropdown-header">Filter by Type</div>
+      <div className="dropdown-header">{t('types.title')}</div>
       
       {SATELLITE_TYPES.map((type) => (
         <div 
@@ -94,7 +96,7 @@ const TypesMenu = ({ onClose }) => {
           onClick={() => handleSelect(type)}
         >
           <span className="dropdown-item-icon">{type.icon}</span>
-          <span>{type.name}</span>
+          <span>{t(type.nameKey)}</span>
           {type.constellations && (
             <span className="dropdown-item-count">{type.constellations.length}</span>
           )}
@@ -108,7 +110,7 @@ const TypesMenu = ({ onClose }) => {
         onClick={handleClearAll}
       >
         <span className="dropdown-item-icon">🗑️</span>
-        <span>Clear All</span>
+        <span>{t('types.clearAll')}</span>
       </div>
     </div>
   );

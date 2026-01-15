@@ -3,11 +3,13 @@
  * Replicates satellitemap.space search functionality
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUiStore } from '../../store/uiStore';
 import { useSatelliteStore } from '../../store/satelliteStore';
 import '../../styles/SearchModal.css';
 
 const SearchModal = () => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
   
@@ -73,7 +75,7 @@ const SearchModal = () => {
             ref={inputRef}
             type="text"
             className="search-input"
-            placeholder="Search satellites..."
+            placeholder={t('search.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -90,13 +92,13 @@ const SearchModal = () => {
           {loading && (
             <div className="search-loading">
               <span className="search-spinner">⟳</span>
-              Searching...
+              {t('search.searching')}
             </div>
           )}
           
           {!loading && query.length >= 2 && searchResults.length === 0 && (
             <div className="search-no-results">
-              No satellites found matching "{query}"
+              {t('search.noResults')} "{query}"
             </div>
           )}
           
@@ -119,7 +121,7 @@ const SearchModal = () => {
           
           {query.length < 2 && (
             <div className="search-hint">
-              Type at least 2 characters to search
+              {t('search.placeholder')}
             </div>
           )}
         </div>

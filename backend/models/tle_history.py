@@ -28,6 +28,7 @@ class TLEHistory(db.Model):
     perigee_km = db.Column(db.Float)
     
     # Metadata
+    source = db.Column(db.String(20), default='SpaceTrack')  # 'SpaceTrack', 'CelesTrak', 'API2'
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     def to_dict(self):

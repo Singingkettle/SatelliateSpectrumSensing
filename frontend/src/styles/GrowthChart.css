@@ -105,3 +105,66 @@
   width: 100%;
   height: 100%;
 }
+
+.growth-svg.interact {
+  cursor: crosshair;
+}
+
+/* Tooltip Styles */
+.growth-tooltip {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  min-width: 160px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.tooltip-header {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-row .label {
+  color: rgba(255, 255, 255, 0.7);
+  margin-right: 12px;
+}
+
+.tooltip-row .value {
+  font-family: 'Space Mono', monospace;
+  color: #ffffff;
+}
+
+.tooltip-row .value.text-highlight {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.dot.appeared { background-color: #22c55e; }
+.dot.decayed { background-color: #ef4444; }
+.dot.active { background-color: #fbbf24; }

@@ -1,56 +1,34 @@
 # Satellite Tracker Start Script for Windows PowerShell
-# Starts Redis, Backend, and Frontend services
+# Kills existing processes and starts Backend and Frontend services
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Satellite Tracker - Startup Script" -ForegroundColor Cyan
+Write-Host "ChangShuoSpace - Satellite Tracker" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
-
-# Check Redis
-Write-Host "[1/4] Checking Redis..." -ForegroundColor Yellow
-$redisPath = "E:\Software\Redis"
-$redisCli = "$redisPath\redis-cli.exe"
-$redisServer = "$redisPath\redis-server.exe"
-
-if (Test-Path $redisCli) {
-    try {
-        $redisCheck = & $redisCli ping 2>&1
-        if ($redisCheck -match "PONG") {
-            Write-Host "  Redis is running" -ForegroundColor Green
-        } else {
-            Write-Host "  Starting Redis..." -ForegroundColor Yellow
-            Start-Process -FilePath $redisServer -WindowStyle Normal
-            Start-Sleep -Seconds 3
-            Write-Host "  Redis started" -ForegroundColor Green
+# Kill existing processes on ports 6359 (backend) and 3000 (frontend)
+Write-Host "[0/3] Cleaning up existing processes..." -ForegroundColor Yellow
+$ports = 6359, 3000
+foreach ($port in $ports) {
+    $pids = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
+    if ($pids) {
+        foreach ($p in $pids) {
+            if ($p -ne 0) {
+                Write-Host "  Killing process $p on port $port" -ForegroundColor Gray
+                Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+            }
         }
-    } catch {
-        Write-Host "  Redis not available, starting..." -ForegroundColor Yellow
-        Start-Process -FilePath $redisServer -WindowStyle Normal
-        Start-Sleep -Seconds 3
     }
-} else {
-    Write-Host "  Warning: Redis not found at $redisPath" -ForegroundColor Yellow
 }
+Start-Sleep -Seconds 1
 
-# Check PostgreSQL
-Write-Host ""
-Write-Host "[2/4] Checking PostgreSQL..." -ForegroundColor Yellow
-try {
-    $pgCheck = & psql -U postgres -c "SELECT 1" 2>&1
-    Write-Host "  PostgreSQL is running" -ForegroundColor Green
-} catch {
-    Write-Host "  Warning: PostgreSQL may not be running" -ForegroundColor Yellow
-    Write-Host "  Please ensure PostgreSQL is running and create database:" -ForegroundColor Yellow
-    Write-Host "    CREATE DATABASE satellite_tracker;" -ForegroundColor White
-}
+$projectRoot = Split-Path -Parent $PSScriptRoot
 
 # Start Backend
 Write-Host ""
-Write-Host "[3/4] Starting Backend..." -ForegroundColor Yellow
+Write-Host "[1/3] Starting Backend..." -ForegroundColor Yellow
 $backendPath = Join-Path $projectRoot "backend"
 
 if (-not (Test-Path "$backendPath\venv")) {
@@ -73,7 +51,7 @@ Start-Sleep -Seconds 3
 
 # Start Frontend
 Write-Host ""
-Write-Host "[4/4] Starting Frontend..." -ForegroundColor Yellow
+Write-Host "[2/3] Starting Frontend..." -ForegroundColor Yellow
 $frontendPath = Join-Path $projectRoot "frontend"
 
 if (-not (Test-Path "$frontendPath\node_modules")) {
@@ -93,7 +71,7 @@ Write-Host "  Frontend starting at http://localhost:3000" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Startup Complete!" -ForegroundColor Green
+Write-Host "[3/3] Startup Complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Backend:  http://localhost:6359" -ForegroundColor White

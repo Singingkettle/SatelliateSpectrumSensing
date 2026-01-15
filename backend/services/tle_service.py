@@ -10,7 +10,6 @@ Multi-source strategy:
 import re
 import math
 import requests
-import redis
 import json
 import time
 import os
@@ -18,9 +17,12 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from threading import Lock
 
-from models import db, Constellation, Satellite, TLEHistory
+from models import db, Constellation, Satellite, TLEHistory, Launch
 from config import Config
+from sqlalchemy.exc import IntegrityError
 
+
+from services.spacetrack_service import SpaceTrackService
 
 class TLEService:
     """
@@ -39,12 +41,30 @@ class TLEService:
     API2_SATELLITES_URL = "https://api2.satellitemap.space/satellites"
     API2_TLE_URL = "https://api2.satellitemap.space/tle"
     
-    # Rate limiting settings - Space-Track.org compliance
-    # IMPORTANT: Space-Track requires minimum 1 hour between queries for same GP data
-    # We use 3600 seconds (1 hour) to comply with their API usage policy
-    RATE_LIMIT_SECONDS = 3600  # Minimum 1 hour between Space-Track API calls per constellation
-    CELESTRAK_RATE_LIMIT = 60  # CelesTrak is more lenient - 1 minute minimum
-    AUTO_FETCH_ENABLED = True  # Enable auto-fetch on missing data
+    # ===== Space-Track.org API Compliance Settings =====
+    # Reference: https://www.space-track.org/documentation
+    #
+    # RATE LIMITS:
+    # - GP (TLEs): 1 query per hour max - add decay_date/null-val/epoch/>now-10 filter
+    # - GP_HISTORY: Once per lifetime - store locally, never re-download
+    # - SATCAT: 1 query per day after 1700 UTC
+    # - General: 30 requests/minute, 300 requests/hour max
+    #
+    # BEST PRACTICES:
+    # - Do NOT schedule scripts at :00 or :30 (peak times)
+    # - Use comma-delimited NORAD IDs instead of individual queries
+    # - Store all downloaded data locally
+    # - Use epoch/>now-10 filter to get only propagable data
+    #
+    RATE_LIMIT_SECONDS = 3600          # 1 hour between Space-Track GP queries per constellation
+    CELESTRAK_RATE_LIMIT = 60          # CelesTrak - 1 minute minimum
+    SATCAT_RATE_LIMIT_SECONDS = 86400  # 24 hours between SATCAT queries
+    HISTORY_RATE_LIMIT_SECONDS = 604800  # 7 days between history backfills per constellation
+    MAX_REQUESTS_PER_MINUTE = 25       # Stay under 30/minute limit
+    AUTO_FETCH_ENABLED = True          # Enable auto-fetch on missing data
+    
+    # History settings
+    HISTORY_DAYS_DEFAULT = 365  # Keep 1 year of history by default
     
     # Slug mapping for api2.satellitemap.space
     # Maps our internal slugs to api2's constellation identifiers
@@ -96,12 +116,6 @@ class TLEService:
     }
 
     def __init__(self):
-        self.redis_client = redis.Redis(
-            host=Config.REDIS_HOST,
-            port=Config.REDIS_PORT,
-            db=Config.REDIS_DB,
-            decode_responses=True,
-        )
         self.celestrak_url = Config.CELESTRAK_BASE_URL
         self.supplemental_url = getattr(Config, "CELESTRAK_SUPPLEMENTAL_URL", None)
         self.constellations = Config.CONSTELLATIONS
@@ -111,9 +125,483 @@ class TLEService:
         self.spacetrack_session = requests.Session()
         self._spacetrack_authenticated = False
         
+        # Dedicated SpaceTrack Service for advanced history fetching
+        self.spacetrack_service = SpaceTrackService()
+        
         # Rate limiting
         self._rate_limit_lock = Lock()
         self._last_fetch_time = {}  # {slug: timestamp}
+
+    def startup_check(self):
+        """
+        Perform startup checks for data integrity.
+        1. Count satellites in each constellation.
+        2. Log status - scheduler will handle any backfill.
+        """
+        print("[TLEService] performing startup check...")
+        
+        # Count satellites per constellation
+        for slug in self.constellations.keys():
+            constellation = Constellation.query.filter_by(slug=slug).first()
+            if constellation:
+                count = Satellite.query.filter_by(constellation_id=constellation.id).count()
+                if count > 0:
+                    print(f"[TLEService] {slug}: {count} satellites in database")
+            
+        print("[TLEService] Startup check complete. History backfill will run via scheduler.")
+
+    def sync_constellation_history(self, constellation_slug: str, days: int = 365) -> int:
+        """
+        Check and backfill historical TLE data for a constellation.
+        Downloads data from Space-Track for the last N days if missing.
+        
+        Args:
+            constellation_slug: Constellation identifier
+            days: Number of days of history to ensure (default 1 year)
+            
+        Returns:
+            Number of new history records added
+        """
+        if not self._check_rate_limit(constellation_slug, 'spacetrack'):
+            print(f"[TLEService] Skipping history sync for {constellation_slug} due to rate limits")
+            return 0
+            
+        print(f"[TLEService] Checking history for {constellation_slug}...")
+        
+        constellation = Constellation.query.filter_by(slug=constellation_slug).first()
+        if not constellation:
+            return 0
+            
+        # Get all satellites for this constellation
+        satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
+        if not satellites:
+            return 0
+            
+        # Find satellites with insufficient history
+        # (Simplified check: check if oldest record is older than `now - days`)
+        target_start_date = datetime.utcnow() - timedelta(days=days)
+        satellites_to_fetch = []
+        
+        for sat in satellites:
+            oldest = TLEHistory.query.filter_by(satellite_id=sat.id)\
+                .order_by(TLEHistory.epoch.asc()).first()
+                
+            # If no history, or oldest history is too recent (e.g. only have data from last week)
+            if not oldest or oldest.epoch > target_start_date + timedelta(days=7):
+                satellites_to_fetch.append(sat)
+        
+        if not satellites_to_fetch:
+            print(f"[TLEService] History is up to date for {constellation_slug}")
+            return 0
+            
+        print(f"[TLEService] Backfilling history for {len(satellites_to_fetch)} satellites in {constellation_slug}")
+        
+        # Fetch from Space-Track using bulk API
+        norad_ids = [s.norad_id for s in satellites_to_fetch]
+        history_data = self.spacetrack_service.get_bulk_history(
+            norad_ids, 
+            start_date=target_start_date
+        )
+        
+        if not history_data:
+            return 0
+            
+        # Save to DB
+        count = self._save_bulk_history_to_db(history_data, constellation)
+        
+        # Update rate limit only after successful fetch
+        self._update_rate_limit(constellation_slug, 'spacetrack')
+        
+        return count
+
+    def sync_catalog_from_spacetrack(self, constellation_slug: str) -> Dict[str, int]:
+        """
+        Sync FULL satellite catalog from Space-Track for a constellation.
+        This fetches ALL objects (active and decayed) to ensure complete history.
+        
+        IMPORTANT: Per Space-Track documentation, SATCAT should only be queried
+        once per day after 1700 UTC. This method includes rate limiting.
+        """
+        if constellation_slug not in self.constellations:
+            return {'error': 'Unknown constellation'}
+        
+        # Check rate limit for SATCAT queries (once per day)
+        rate_key = f"satcat:{constellation_slug}"
+        with self._rate_limit_lock:
+            last_time = self._last_fetch_time.get(rate_key, 0)
+            if time.time() - last_time < self.SATCAT_RATE_LIMIT_SECONDS:
+                remaining_hours = int((self.SATCAT_RATE_LIMIT_SECONDS - (time.time() - last_time)) / 3600)
+                print(f"[TLEService] SATCAT rate limited for {constellation_slug}, {remaining_hours}h remaining")
+                return {'error': f'SATCAT rate limited, try again in {remaining_hours}h', 'rate_limited': True}
+            
+        config = self.constellations[constellation_slug]
+        query = config.get('spacetrack_query')
+        if not query:
+            return {'error': 'No Space-Track query configured'}
+            
+        print(f"[TLEService] Syncing full catalog for {constellation_slug} using query: {query}")
+        print(f"[TLEService] NOTE: SATCAT query should only run once/day per Space-Track policy")
+        
+        # Query Space-Track
+        satcat_data = self.spacetrack_service.query_satcat(query)
+        if not satcat_data:
+            print(f"[TLEService] No catalog data returned for {constellation_slug}")
+            return {'count': 0, 'new': 0, 'updated': 0}
+        
+        # Update rate limit timestamp
+        with self._rate_limit_lock:
+            self._last_fetch_time[rate_key] = time.time()
+            
+        print(f"[TLEService] Processing {len(satcat_data)} catalog records for {constellation_slug}")
+        
+        # Get Constellation ID
+        constellation = Constellation.query.filter_by(slug=constellation_slug).first()
+        if not constellation:
+            # Should have been created by now, but just in case
+            return {'error': 'Constellation not found in DB'}
+
+        # Process
+        count_new = 0
+        count_updated = 0
+        count_launches = 0
+        
+        try:
+            # Filter valid items first
+            valid_items = [i for i in satcat_data if i.get('NORAD_CAT_ID')]
+
+            # Preload existing satellites for this constellation to minimize queries
+            # We also check global NORAD IDs to avoid dupes if they were unassigned
+            existing_sats = Satellite.query.filter(
+                (Satellite.constellation_id == constellation.id) | 
+                (Satellite.norad_id.in_([int(i['NORAD_CAT_ID']) for i in valid_items]))
+            ).all()
+            sat_map = {s.norad_id: s for s in existing_sats}
+            
+            # Preload Launches
+            cospars = {
+                item.get('INTLDES', '')[:8]
+                for item in valid_items
+                if item.get('INTLDES')
+            }
+            existing_launches = Launch.query.filter(Launch.cospar_id.in_(list(cospars))).all() if cospars else []
+            launch_map = {l.cospar_id: l for l in existing_launches}
+            
+            for item in valid_items:
+                norad_id = int(item['NORAD_CAT_ID'])
+                satellite = sat_map.get(norad_id)
+                
+                # Create Satellite if missing
+                if not satellite:
+                    satellite = Satellite(
+                        norad_id=norad_id,
+                        name=item.get('SATNAME', f"Unknown-{norad_id}"),
+                        constellation_id=constellation.id,
+                        is_active=item.get('DECAY') is None
+                    )
+                    db.session.add(satellite)
+                    sat_map[norad_id] = satellite # Add to map for subsequent updates
+                    count_new += 1
+                else:
+                    # Ensure constellation link
+                    if satellite.constellation_id != constellation.id:
+                        satellite.constellation_id = constellation.id
+                        count_updated += 1
+                
+                # Update Satellite Metadata
+                if item.get('SATNAME'):
+                    satellite.name = item['SATNAME']
+                if item.get('INTLDES'):
+                    satellite.intl_designator = item['INTLDES']
+                if item.get('LAUNCH'):
+                    satellite.launch_date = datetime.strptime(item['LAUNCH'], '%Y-%m-%d').date()
+                if item.get('DECAY'):
+                    satellite.decay_date = datetime.strptime(item['DECAY'], '%Y-%m-%d').date()
+                    satellite.is_active = False
+                if item.get('COUNTRY'):
+                    satellite.country_code = item['COUNTRY']
+                if item.get('RCS'): # Radar Cross Section
+                    satellite.rcs_size = item['RCS']
+                if item.get('OBJECT_TYPE'):
+                    satellite.object_type = item['OBJECT_TYPE']
+
+                # Handle Launch Link
+                intldes = item.get('INTLDES', '')
+                launch_cospar = intldes[:8] if len(intldes) >= 8 else intldes
+                
+                if launch_cospar:
+                    launch = launch_map.get(launch_cospar)
+                    if not launch:
+                        try:
+                            with db.session.begin_nested():
+                                launch = Launch(
+                                    cospar_id=launch_cospar,
+                                    mission_name=item.get('SATNAME'),
+                                    launch_date=satellite.launch_date and datetime.combine(satellite.launch_date, datetime.min.time()),
+                                    launch_site=item.get('SITE'),
+                                )
+                                db.session.add(launch)
+                                db.session.flush()
+                                count_launches += 1
+                            launch_map[launch_cospar] = launch
+                        except IntegrityError:
+                            db.session.rollback()
+                            launch = Launch.query.filter_by(cospar_id=launch_cospar).first()
+                            if launch:
+                                launch_map[launch_cospar] = launch
+                    
+                    if launch:
+                        satellite.launch_id = launch.id
+
+            db.session.commit()
+            print(f"[TLEService] Catalog sync for {constellation_slug}: {count_new} new, {count_updated} updated, {count_launches} launches")
+            return {'count': len(satcat_data), 'new': count_new, 'updated': count_updated, 'launches': count_launches}
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"[TLEService] Catalog sync error: {e}")
+            return {'error': str(e)}
+
+    def sync_satellite_history(self, norad_id: int, days: int = 365) -> int:
+        """
+        Backfill history for a specific satellite.
+        Creates the satellite if it doesn't exist.
+        """
+        satellite = Satellite.query.filter_by(norad_id=norad_id).first()
+        
+        # If missing, try to create it from Space-Track latest TLE
+        if not satellite:
+            print(f"[TLEService] Satellite {norad_id} not found, fetching metadata...")
+            latest_tle_list = self.spacetrack_service.get_latest_tle_by_norad([norad_id])
+            if not latest_tle_list:
+                print(f"[TLEService] Could not find satellite {norad_id} in Space-Track")
+                return 0
+            
+            latest_tle = latest_tle_list[0]
+            satellite = Satellite(
+                norad_id=norad_id,
+                name=latest_tle.get('OBJECT_NAME', f'Unknown-{norad_id}'),
+                tle_line1=latest_tle.get('TLE_LINE1'),
+                tle_line2=latest_tle.get('TLE_LINE2'),
+                intl_designator=latest_tle.get('INTLDES'),
+                is_active=True
+            )
+            # Try to parse epoch
+            try:
+                if latest_tle.get('EPOCH'):
+                    satellite.tle_epoch = datetime.strptime(latest_tle['EPOCH'], '%Y-%m-%dT%H:%M:%S.%f') if '.' in latest_tle['EPOCH'] else datetime.strptime(latest_tle['EPOCH'], '%Y-%m-%dT%H:%M:%S')
+            except:
+                pass
+                
+            db.session.add(satellite)
+            db.session.commit()
+            
+        # Fetch history
+        print(f"[TLEService] Fetching history for satellite {norad_id} ({days} days)...")
+        target_start_date = datetime.utcnow() - timedelta(days=days)
+        history_data = self.spacetrack_service.get_bulk_history([norad_id], start_date=target_start_date)
+        
+        if not history_data:
+            return 0
+            
+        # Save history
+        count = 0
+        try:
+            for item in history_data:
+                # Parse epoch
+                try:
+                    epoch_str = item.get('EPOCH')
+                    epoch = datetime.strptime(epoch_str, '%Y-%m-%dT%H:%M:%S.%f') if '.' in epoch_str else datetime.strptime(epoch_str, '%Y-%m-%dT%H:%M:%S')
+                except:
+                    continue
+                    
+                # Check duplicates
+                exists = TLEHistory.query.filter_by(
+                    satellite_id=satellite.id, 
+                    epoch=epoch
+                ).first()
+                
+                if not exists:
+                    history = TLEHistory(
+                        satellite_id=satellite.id,
+                        tle_line1=item.get('TLE_LINE1'),
+                        tle_line2=item.get('TLE_LINE2'),
+                        epoch=epoch,
+                        source='SpaceTrack_Manual',
+                        mean_motion=float(item.get('MEAN_MOTION', 0)),
+                        eccentricity=float(item.get('ECCENTRICITY', 0)),
+                        inclination=float(item.get('INCLINATION', 0)),
+                        semi_major_axis_km=float(item.get('SEMIMAJOR_AXIS', 0)),
+                        apogee_km=float(item.get('APOAPSIS', 0)),
+                        perigee_km=float(item.get('PERIAPSIS', 0))
+                    )
+                    db.session.add(history)
+                    count += 1
+            
+            db.session.commit()
+            print(f"[TLEService] Saved {count} history records for satellite {norad_id}")
+            return count
+        except Exception as e:
+            db.session.rollback()
+            print(f"[TLEService] Error saving satellite history: {e}")
+            return 0
+
+    def update_satcat_data(self, constellation_slug: str) -> Dict[str, int]:
+        """
+        Fetch and update SATCAT data (launch info, decay date) for a constellation.
+        This enriches the satellite data with launch details.
+        """
+        print(f"[TLEService] Updating SATCAT data for {constellation_slug}...")
+        
+        constellation = Constellation.query.filter_by(slug=constellation_slug).first()
+        if not constellation:
+            return {'updated': 0, 'launches': 0}
+            
+        satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
+        if not satellites:
+            return {'updated': 0, 'launches': 0}
+            
+        # Get list of NORAD IDs
+        norad_ids = [s.norad_id for s in satellites]
+        
+        # Fetch SATCAT data from Space-Track service
+        satcat_data = self.spacetrack_service.get_satcat_data(norad_ids)
+        
+        if not satcat_data:
+            print(f"[TLEService] No SATCAT data returned for {constellation_slug}")
+            return {'updated': 0, 'launches': 0}
+            
+        print(f"[TLEService] Processing {len(satcat_data)} SATCAT records for {constellation_slug}")
+        
+        # Process and update
+        count_updated = 0
+        count_launches = 0
+        
+        try:
+            # Map NORAD ID to Satellite object for quick lookup
+            sat_map = {s.norad_id: s for s in satellites}
+            # Preload existing launches to avoid duplicate inserts
+            cospars = {
+                item.get('INTLDES', '')[:8]
+                for item in satcat_data
+                if item.get('INTLDES')
+            }
+            existing_launches = Launch.query.filter(Launch.cospar_id.in_(list(cospars))).all() if cospars else []
+            launch_map = {l.cospar_id: l for l in existing_launches}
+            
+            for item in satcat_data:
+                norad_id = int(item.get('NORAD_CAT_ID'))
+                satellite = sat_map.get(norad_id)
+                
+                if not satellite:
+                    continue
+                    
+                # Handle Launch Info
+                intldes = item.get('INTLDES', '') # e.g., 2024-012A
+                
+                # Launch ID is usually the first part of INTLDES (YYYY-NNN)
+                # But sometimes it varies. Let's use the full INTLDES as COSPAR for the satellite, 
+                # but group launches by the base ID (without piece code).
+                launch_cospar = intldes[:8] if len(intldes) >= 8 else intldes # 2024-012
+                
+                if launch_cospar:
+                    # Find or create Launch
+                    launch = launch_map.get(launch_cospar)
+                    if not launch:
+                        try:
+                            with db.session.begin_nested():
+                                launch = Launch(
+                                    cospar_id=launch_cospar,
+                                    mission_name=item.get('SATNAME'), # Fallback mission name from first sat
+                                    launch_date=datetime.strptime(item.get('LAUNCH'), '%Y-%m-%d') if item.get('LAUNCH') else None,
+                                    launch_site=item.get('SITE'),
+                                    # We might need better source for rocket type/mission name
+                                )
+                                db.session.add(launch)
+                                db.session.flush() # Get ID
+                                count_launches += 1
+                            launch_map[launch_cospar] = launch
+                        except IntegrityError:
+                            db.session.rollback()
+                            launch = Launch.query.filter_by(cospar_id=launch_cospar).first()
+                            if launch:
+                                launch_map[launch_cospar] = launch
+                    
+                    satellite.launch_id = launch.id
+                
+                # Update Satellite fields
+                if item.get('LAUNCH'):
+                    satellite.launch_date = datetime.strptime(item.get('LAUNCH'), '%Y-%m-%d').date()
+                
+                if item.get('DECAY'):
+                    satellite.decay_date = datetime.strptime(item.get('DECAY'), '%Y-%m-%d').date()
+                    satellite.is_active = False # Decayed means inactive
+                
+                if item.get('SITE'):
+                    satellite.country_code = item.get('COUNTRY')
+                
+                count_updated += 1
+                
+            db.session.commit()
+            print(f"[TLEService] Updated SATCAT for {count_updated} satellites, created {count_launches} launches")
+            return {'updated': count_updated, 'launches': count_launches}
+        except Exception as e:
+            db.session.rollback()
+            print(f"[TLEService] Error updating SATCAT: {e}")
+            return {'updated': 0, 'launches': 0}
+
+    def _save_bulk_history_to_db(self, tle_list: List[Dict], constellation: Constellation) -> int:
+        """
+        Save a bulk list of TLEs (from Space-Track GP format) to TLEHistory.
+        """
+        count = 0
+        try:
+            # Pre-fetch satellite map for faster lookups {norad_id: satellite_obj}
+            satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
+            sat_map = {s.norad_id: s for s in satellites}
+            
+            for item in tle_list:
+                if not item.get('NORAD_CAT_ID'):
+                    continue
+
+                norad_id = int(item.get('NORAD_CAT_ID'))
+                satellite = sat_map.get(norad_id)
+                
+                if not satellite:
+                    continue
+                    
+                epoch = datetime.strptime(item.get('EPOCH'), '%Y-%m-%dT%H:%M:%S.%f') if '.' in item.get('EPOCH') else datetime.strptime(item.get('EPOCH'), '%Y-%m-%dT%H:%M:%S')
+                
+                # Check if this specific TLE already exists to avoid dupes
+                exists = TLEHistory.query.filter_by(
+                    satellite_id=satellite.id, 
+                    epoch=epoch
+                ).first()
+                
+                if not exists:
+                    history = TLEHistory(
+                        satellite_id=satellite.id,
+                        tle_line1=item.get('TLE_LINE1'),
+                        tle_line2=item.get('TLE_LINE2'),
+                        epoch=epoch,
+                        source='SpaceTrack_Backfill',
+                        # Optional params
+                        mean_motion=float(item.get('MEAN_MOTION', 0)),
+                        eccentricity=float(item.get('ECCENTRICITY', 0)),
+                        inclination=float(item.get('INCLINATION', 0)),
+                        semi_major_axis_km=float(item.get('SEMIMAJOR_AXIS', 0)),
+                        apogee_km=float(item.get('APOAPSIS', 0)),
+                        perigee_km=float(item.get('PERIAPSIS', 0))
+                    )
+                    db.session.add(history)
+                    count += 1
+            
+            db.session.commit()
+            print(f"[TLEService] Saved {count} historical records")
+            return count
+        except Exception as e:
+            db.session.rollback()
+            print(f"[TLEService] Error saving bulk history: {e}")
+            return 0
 
     # ==================== Rate Limiting ====================
     
@@ -640,6 +1128,7 @@ class TLEService:
                         tle_line1=entry["line1"],
                         tle_line2=entry["line2"],
                         epoch=entry.get("epoch"),
+                        source=source,
                         semi_major_axis_km=entry.get("semi_major_axis_km"),
                         mean_motion=entry.get("mean_motion"),
                         eccentricity=entry.get("eccentricity"),
@@ -683,65 +1172,38 @@ class TLEService:
         self._cache_constellation_tle(constellation_slug)
 
         print(f"[{source}] Updated {constellation_slug}: {new_count} new, {updated_count} updated")
+        
+        # Trigger SATCAT update to enrich data (Launch info, decay)
+        # We do this after TLE update
+        if new_count > 0 or updated_count > 0:
+            try:
+                self.update_satcat_data(constellation_slug)
+            except Exception as e:
+                print(f"[TLEService] Failed to trigger SATCAT update: {e}")
+                
         return new_count, updated_count
 
     def _cache_constellation_tle(self, constellation_slug: str):
-        """Cache constellation TLE data in Redis for fast access."""
-        constellation = Constellation.query.filter_by(slug=constellation_slug).first()
-        if not constellation:
-            return
-
-        satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
-        tle_data = [sat.to_tle_dict() for sat in satellites]
-
-        # Use versioned cache key
-        cache_key = f"tle:v2:{constellation_slug}"
-        try:
-            self.redis_client.set(
-                cache_key, json.dumps(tle_data), ex=Config.TLE_CACHE_EXPIRY
-            )
-        except Exception as e:
-            print(f"[Cache] Error caching TLE for {constellation_slug}: {e}")
+        """No-op: caching removed. Data is served directly from SQLite."""
+        pass
 
     def get_constellation_tle(self, constellation_slug: str, auto_fetch: bool = True) -> List[Dict]:
         """
-        Get TLE data for a constellation, using cache when available.
+        Get TLE data for a constellation from SQLite database.
         If auto_fetch is True and data is missing, automatically fetch from external sources.
         
         Multi-source strategy:
-        1. Check Redis cache
-        2. Check database
-        3. If empty and auto_fetch enabled: fetch from api2 → SpaceTrack → CelesTrak
+        1. Check database
+        2. If empty and auto_fetch enabled: fetch from api2 → SpaceTrack → CelesTrak
         """
-        # Version the cache key to handle schema changes
-        cache_key = f"tle:v2:{constellation_slug}"
-        
-        # 1. Check cache first
-        try:
-            cached = self.redis_client.get(cache_key)
-            if cached:
-                data = json.loads(cached)
-                if data:  # Non-empty cache
-                    return data
-        except Exception as e:
-            print(f"[Cache] Redis error: {e}")
-
-        # 2. Check database
+        # 1. Check database first
         constellation = Constellation.query.filter_by(slug=constellation_slug).first()
         if constellation:
             satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
             if satellites:
-                tle_data = [sat.to_tle_dict() for sat in satellites]
-                # Update cache
-                try:
-                    self.redis_client.set(
-                        cache_key, json.dumps(tle_data), ex=Config.TLE_CACHE_EXPIRY
-                    )
-                except Exception:
-                    pass
-                return tle_data
+                return [sat.to_tle_dict() for sat in satellites]
         
-        # 3. Auto-fetch if enabled and data is missing
+        # 2. Auto-fetch if enabled and data is missing
         if auto_fetch and self.AUTO_FETCH_ENABLED and constellation_slug in self.constellations:
             # Check rate limit (source defaults to spacetrack for this call site)
             if not self._check_rate_limit(constellation_slug):
@@ -758,17 +1220,7 @@ class TLEService:
                     constellation = Constellation.query.filter_by(slug=constellation_slug).first()
                     if constellation:
                         satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
-                        tle_data = [sat.to_tle_dict() for sat in satellites]
-
-                        # Update cache
-                        try:
-                            self.redis_client.set(
-                                cache_key, json.dumps(tle_data), ex=Config.TLE_CACHE_EXPIRY
-                            )
-                        except Exception:
-                            pass
-
-                        return tle_data
+                        return [sat.to_tle_dict() for sat in satellites]
             except Exception as e:
                 print(f"[AutoFetch] Error fetching {constellation_slug}: {e}")
 

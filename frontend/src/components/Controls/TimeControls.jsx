@@ -4,10 +4,13 @@
  * Now uses centralized timeStore for Cesium clock synchronization
  */
 import React, { useState, useEffect } from 'react';
-import { useTimeStore, SPEED_PRESETS } from '../../store/timeStore';
+import { useTranslation } from 'react-i18next';
+import { useTimeStore } from '../../store/timeStore';
 import '../../styles/TimeControls.css';
 
 const TimeControls = () => {
+  const { t } = useTranslation();
+  
   // Get state and actions from timeStore
   const currentTime = useTimeStore(s => s.currentTime);
   const isPlaying = useTimeStore(s => s.isPlaying);
@@ -71,7 +74,7 @@ const TimeControls = () => {
         <span className="time-clock">{formatTime(displayTime)}</span>
         <span className="time-zone"> UTC</span>
         {showSpeedIndicator && (
-          <span className="time-speed" title={`Speed: ${speedLabel}`}>
+          <span className="time-speed" title={`${t('time.speed')}: ${speedLabel}`}>
             {speedLabel}
           </span>
         )}
@@ -82,7 +85,7 @@ const TimeControls = () => {
         <button 
           className="time-btn"
           onClick={handleRewind}
-          title="Slower / Rewind"
+          title={t('time.slower')}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polygon points="19 20 9 12 19 4 19 20"/>
@@ -93,7 +96,7 @@ const TimeControls = () => {
         <button 
           className={`time-btn ${!isPlaying ? 'paused' : ''}`}
           onClick={handlePlayPause}
-          title={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? t('time.pause') : t('time.play')}
         >
           {isPlaying ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -110,7 +113,7 @@ const TimeControls = () => {
         <button 
           className="time-btn"
           onClick={handleForward}
-          title="Faster / Forward"
+          title={t('time.faster')}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polygon points="5 4 15 12 5 20 5 4"/>
@@ -121,7 +124,7 @@ const TimeControls = () => {
         <button 
           className="time-btn"
           onClick={handleReset}
-          title="Reset to current time"
+          title={t('time.resetToNow')}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>

@@ -3,18 +3,20 @@
  * Replicates satellitemap.space More dropdown
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUiStore } from '../../store/uiStore';
 
 const MORE_ITEMS = [
-  { name: 'Login', slug: 'login', icon: '👤' },
-  { name: 'Settings', slug: 'settings', icon: '⚙️' },
-  { name: 'Feedback', slug: 'feedback', icon: '💬' },
-  { name: 'Credits', slug: 'credits', icon: '📜' },
-  { name: 'Info & Updates', slug: 'info-updates', icon: 'ℹ️' },
-  { name: 'Space-track Status', slug: 'spacetrack-status', icon: '📡' },
+  { nameKey: 'more.login', slug: 'login', icon: '👤' },
+  { nameKey: 'more.settings', slug: 'settings', icon: '⚙️' },
+  { nameKey: 'more.feedback', slug: 'feedback', icon: '💬' },
+  { nameKey: 'more.credits', slug: 'credits', icon: '📜' },
+  { nameKey: 'more.infoUpdates', slug: 'info-updates', icon: 'ℹ️' },
+  { nameKey: 'more.spacetrackStatus', slug: 'spacetrack-status', icon: '📡' },
 ];
 
 const MoreMenu = ({ onClose }) => {
+  const { t } = useTranslation();
   const setShowSettingsModal = useUiStore(s => s.setShowSettingsModal);
   const setShowSpaceTrackStatus = useUiStore(s => s.setShowSpaceTrackStatus);
   
@@ -49,7 +51,7 @@ const MoreMenu = ({ onClose }) => {
   
   return (
     <div className="dropdown-menu more-menu">
-      <div className="dropdown-header">More Options</div>
+      <div className="dropdown-header">{t('more.title')}</div>
       
       {MORE_ITEMS.map((item) => (
         <div 
@@ -58,7 +60,7 @@ const MoreMenu = ({ onClose }) => {
           onClick={() => handleSelect(item.slug)}
         >
           <span className="dropdown-item-icon">{item.icon}</span>
-          <span>{item.name}</span>
+          <span>{t(item.nameKey)}</span>
         </div>
       ))}
     </div>

@@ -43,7 +43,7 @@ export const useSatelliteStore = create((set, get) => ({
   
   // Satellite data
   selectedSatellite: null,      // Currently selected satellite for details panel
-  orbitSatellite: null,         // Satellite whose orbit is being displayed (independent of info panel)
+  orbitSatellites: new Map(),   // Map of norad_id -> satellite data for multiple simultaneous orbits
   searchResults: [],            // Search results
   searchQuery: '',              // Current search query
   
@@ -190,6 +190,7 @@ export const useSatelliteStore = create((set, get) => ({
   
   /**
    * Clear all constellation selections
+   * Also clears all orbit lines when switching constellations
    */
   clearAllConstellations: () => {
     set({
@@ -197,6 +198,7 @@ export const useSatelliteStore = create((set, get) => ({
       constellationData: {},
       totalSatellitesLoaded: 0,
       selectedSatellite: null,
+      orbitSatellites: new Map(),  // Clear all orbits when switching constellations
     });
   },
   
@@ -204,7 +206,7 @@ export const useSatelliteStore = create((set, get) => ({
    * Toggle constellation selection
    */
   toggleConstellation: async (slug) => {
-    const { selectedConstellations, constellationData } = get();
+    const { selectedConstellations } = get();
     
     if (selectedConstellations.includes(slug)) {
       // Unload if already selected (clicking same constellation toggles it off)
@@ -311,27 +313,72 @@ export const useSatelliteStore = create((set, get) => ({
   /**
    * Set selected satellite directly (bypasses API call)
    * Useful when we already have satellite data from entity properties
-   * Also sets orbitSatellite to display orbit line
+   * Also adds to orbitSatellites to display orbit line
    */
   setSelectedSatellite: (satellite) => {
-    set({ 
-      selectedSatellite: satellite,
-      orbitSatellite: satellite  // Also set orbit satellite
-    });
+    if (satellite) {
+      const newOrbits = new Map(get().orbitSatellites);
+      newOrbits.set(satellite.norad_id, satellite);
+      set({ 
+        selectedSatellite: satellite,
+        orbitSatellites: newOrbits,
+      });
+    } else {
+      set({ selectedSatellite: null });
+    }
   },
   
   /**
-   * Set orbit satellite (for orbit line display, independent of info panel)
+   * Add a satellite orbit to display (supports multiple simultaneous orbits)
    */
-  setOrbitSatellite: (satellite) => {
-    set({ orbitSatellite: satellite });
+  addOrbitSatellite: (satellite) => {
+    if (!satellite) return;
+    const newOrbits = new Map(get().orbitSatellites);
+    newOrbits.set(satellite.norad_id, satellite);
+    set({ orbitSatellites: newOrbits });
   },
   
   /**
-   * Clear orbit display
+   * Remove a specific satellite's orbit
    */
-  clearOrbit: () => {
-    set({ orbitSatellite: null });
+  removeOrbitSatellite: (noradId) => {
+    const newOrbits = new Map(get().orbitSatellites);
+    newOrbits.delete(noradId);
+    set({ orbitSatellites: newOrbits });
+  },
+  
+  /**
+   * Toggle orbit for a satellite (add if not shown, remove if shown)
+   * Returns true if orbit was added, false if removed
+   */
+  toggleOrbitSatellite: (satellite) => {
+    if (!satellite) return false;
+    const { orbitSatellites } = get();
+    const newOrbits = new Map(orbitSatellites);
+    
+    if (newOrbits.has(satellite.norad_id)) {
+      newOrbits.delete(satellite.norad_id);
+      set({ orbitSatellites: newOrbits });
+      return false;
+    } else {
+      newOrbits.set(satellite.norad_id, satellite);
+      set({ orbitSatellites: newOrbits });
+      return true;
+    }
+  },
+  
+  /**
+   * Check if a satellite's orbit is currently displayed
+   */
+  hasOrbit: (noradId) => {
+    return get().orbitSatellites.has(noradId);
+  },
+  
+  /**
+   * Clear all orbit displays
+   */
+  clearAllOrbits: () => {
+    set({ orbitSatellites: new Map() });
   },
   
   /**

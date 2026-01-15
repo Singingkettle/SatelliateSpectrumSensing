@@ -7,23 +7,13 @@ import { useTranslation } from 'react-i18next';
 import { useSatelliteStore } from '../../store/satelliteStore';
 import '../../styles/LegendPanel.css';
 
-// Legend views/modes
-const LEGEND_VIEWS = [
-  { id: 'inclination', label: 'Inclination', icon: '📐' },
-  { id: 'constellation', label: 'Constellation', icon: '⭐' },
-  { id: 'altitude', label: 'Orbital Altitude', icon: '📏' },
-  { id: 'hardware', label: 'Hardware Type', icon: '🛰️' },
-  { id: 'reentry', label: 'Re-entry Risk', icon: '☄️' },
-  { id: 'orbit', label: 'Orbit Type', icon: '🌍' },
-];
-
 // Inclination categories
 const INCLINATION_CATEGORIES = [
-  { label: 'Equatorial', sublabel: '0°-30°', color: '#ef4444', key: 'equatorial' },
-  { label: 'Low', sublabel: '30°-60°', color: '#f97316', key: 'low' },
-  { label: 'Medium', sublabel: '60°-90°', color: '#eab308', key: 'medium' },
-  { label: 'High', sublabel: '90°-120°', color: '#22c55e', key: 'high' },
-  { label: 'Retrograde', sublabel: '120°-180°', color: '#3b82f6', key: 'retrograde' },
+  { labelKey: 'legend.equatorial', sublabel: '0°-30°', color: '#ef4444', key: 'equatorial' },
+  { labelKey: 'legend.low', sublabel: '30°-60°', color: '#f97316', key: 'low' },
+  { labelKey: 'legend.medium', sublabel: '60°-90°', color: '#eab308', key: 'medium' },
+  { labelKey: 'legend.high', sublabel: '90°-120°', color: '#22c55e', key: 'high' },
+  { labelKey: 'legend.retrograde', sublabel: '120°-180°', color: '#3b82f6', key: 'retrograde' },
 ];
 
 // Orbit altitude categories
@@ -43,6 +33,16 @@ const LegendPanel = () => {
   
   const selectedConstellations = useSatelliteStore(s => s.selectedConstellations);
   const constellationData = useSatelliteStore(s => s.constellationData);
+  
+  // Legend views/modes
+  const LEGEND_VIEWS = [
+    { id: 'inclination', labelKey: 'legend.inclination', icon: '📐' },
+    { id: 'constellation', labelKey: 'legend.constellation', icon: '⭐' },
+    { id: 'altitude', labelKey: 'legend.altitude', icon: '📏' },
+    { id: 'hardware', labelKey: 'legend.hardwareType', icon: '🛰️' },
+    { id: 'reentry', labelKey: 'legend.reentryRisk', icon: '☄️' },
+    { id: 'orbit', labelKey: 'legend.orbitType', icon: '🌍' },
+  ];
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -132,7 +132,7 @@ const LegendPanel = () => {
       <button 
         className="legend-collapse-btn"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        title={isCollapsed ? 'Expand' : 'Collapse'}
+        title={isCollapsed ? t('legend.expand') : t('legend.collapse')}
       >
         {isCollapsed ? '◀' : '▶'}
       </button>
@@ -141,7 +141,7 @@ const LegendPanel = () => {
         <>
           {/* Header with title */}
           <div className="legend-header">
-            <h3 className="legend-title">{t(`legend.${currentView.id}`, currentView.label)}</h3>
+            <h3 className="legend-title">{t(currentView.labelKey)}</h3>
           </div>
           
           {/* Inclination Legend Items */}
@@ -154,7 +154,7 @@ const LegendPanel = () => {
                       className="legend-color"
                       style={{ backgroundColor: cat.color }}
                     />
-                    <span className="legend-label">{t(`legend.${cat.key}`, cat.label)}</span>
+                    <span className="legend-label">{t(cat.labelKey)}</span>
                     <span className="legend-sublabel">{cat.sublabel}</span>
                   </div>
                 ))}
@@ -164,12 +164,12 @@ const LegendPanel = () => {
               {stats.total > 0 && (
                 <div className="legend-stats">
                   <div className="legend-stat-title">
-                    {t('legend.distribution', 'Distribution')} ({formatNumber(stats.total)} {t('legend.satellites', 'satellites')})
+                    {t('legend.distribution')} ({formatNumber(stats.total)} {t('legend.satellites')})
                   </div>
                   {INCLINATION_CATEGORIES.map(cat => (
                     <div key={cat.key} className="legend-stat-row">
                       <span className="legend-stat-dot" style={{ backgroundColor: cat.color }} />
-                      <span className="legend-stat-label">{t(`legend.${cat.key}`, cat.label)}</span>
+                      <span className="legend-stat-label">{t(cat.labelKey)}</span>
                       <span className="legend-stat-count">{stats[cat.key]}</span>
                       <span className="legend-stat-value">
                         ({formatPercent(stats[cat.key], stats.total)})
@@ -200,7 +200,7 @@ const LegendPanel = () => {
               {stats.total > 0 && (
                 <div className="legend-stats">
                   <div className="legend-stat-title">
-                    Distribution ({formatNumber(stats.total)})
+                    {t('legend.distribution')} ({formatNumber(stats.total)})
                   </div>
                   <div className="legend-stat-row">
                     <span className="legend-stat-dot" style={{ backgroundColor: '#22c55e' }} />
@@ -226,7 +226,7 @@ const LegendPanel = () => {
           {currentView.id === 'constellation' && (
             <div className="legend-items constellation-list">
               {selectedConstellations.length === 0 ? (
-                <div className="legend-empty">No constellations selected</div>
+                <div className="legend-empty">{t('legend.noSelection')}</div>
               ) : (
                 selectedConstellations.map(slug => (
                   <div key={slug} className="legend-item constellation-item">
@@ -244,7 +244,7 @@ const LegendPanel = () => {
           {!['inclination', 'altitude', 'constellation'].includes(currentView.id) && (
             <div className="legend-placeholder">
               <span className="placeholder-icon">{currentView.icon}</span>
-              <span className="placeholder-text">Coming soon</span>
+              <span className="placeholder-text">{t('common.comingSoon')}</span>
             </div>
           )}
           
@@ -253,21 +253,21 @@ const LegendPanel = () => {
             <button 
               className="legend-nav-btn"
               onClick={handlePrevView}
-              title="Previous view"
+              title={t('legend.previousView')}
             >
               ‹
             </button>
             <button 
               className={`legend-nav-btn menu-btn ${showViewSelector ? 'active' : ''}`}
               onClick={handleMenuClick}
-              title="Select view"
+              title={t('legend.selectView')}
             >
               ☰
             </button>
             <button 
               className="legend-nav-btn"
               onClick={handleNextView}
-              title="Next view"
+              title={t('legend.nextView')}
             >
               ›
             </button>
@@ -282,7 +282,7 @@ const LegendPanel = () => {
                     onClick={() => handleSelectView(index)}
                   >
                     <span className="view-icon">{view.icon}</span>
-                    <span className="view-label">{view.label}</span>
+                    <span className="view-label">{t(view.labelKey)}</span>
                   </button>
                 ))}
               </div>

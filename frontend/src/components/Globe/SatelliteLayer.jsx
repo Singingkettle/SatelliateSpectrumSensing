@@ -3,7 +3,7 @@
  * Uses inclination-based color coding matching satellitemap.space
  * Optimized for performance with thousands of satellites
  */
-import React, { useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { useCesium } from 'resium';
 import * as Cesium from 'cesium';
 import { useSatelliteStore } from '../../store/satelliteStore';
@@ -135,115 +135,6 @@ const precalculateOrbitEci = (line1, line2, centerTime, periodMinutes = null, nu
 };
 
 /**
- * Create orbit positions as an array of Cartesian3 for polyline visualization.
- *
- * IMPORTANT:
- * - Use ECI->ECF and return ECEF Cartesian (meters). This avoids longitude wrap issues
- *   (e.g., crossing +/-180°) that can create "wrong looking" orbit segments.
- * - Orbit is centered on the current time (half period backward + forward), matching satellitemap.space.
- */
-const createOrbitPositions = (line1, line2, centerTime, periodMinutes = null, numPoints = 180) => {
-  try {
-    if (!line1 || !line2) {
-      console.warn('[createOrbitPositions] Missing TLE lines');
-      return [];
-    }
-    
-    const satrec = satellite.twoline2satrec(line1, line2);
-    if (!satrec || satrec.error) {
-      console.warn('[createOrbitPositions] Invalid TLE, satrec error:', satrec?.error);
-      return [];
-    }
-    
-    // Calculate orbital period from TLE mean motion if not provided
-    // Mean motion is in revolutions per day, convert to minutes per revolution
-    const meanMotion = satrec.no * 1440 / (2 * Math.PI); // rev/day
-    const calculatedPeriod = periodMinutes || (1440 / meanMotion); // minutes per orbit
-    
-    const positions = [];
-    
-    // Calculate half period to center the orbit on current position
-    const halfPeriod = calculatedPeriod / 2;
-    const stepMinutes = calculatedPeriod / numPoints;
-    
-    // Start from half period BEFORE current time, end half period AFTER
-    // This centers the visible orbit on the satellite's current position
-    const startTime = new Date(centerTime.getTime() - halfPeriod * 60000);
-    
-    // Calculate GMST at the CENTER time. 
-    // Using a fixed GMST for all points renders the "Instantaneous Orbit" (Keplerian ellipse)
-    // in the ECEF frame, appearing as a closed loop relative to the earth.
-    // If we used variable GMST, we would get the "Ground Track" (wavy line).
-    const fixedGmst = satellite.gstime(centerTime);
-    
-    for (let i = 0; i <= numPoints; i++) {
-      const time = new Date(startTime.getTime() + i * stepMinutes * 60000);
-      const positionAndVelocity = satellite.propagate(satrec, time);
-      
-      // Check if position is valid (not NaN and exists)
-      if (positionAndVelocity.position && 
-          typeof positionAndVelocity.position.x === 'number' &&
-          !isNaN(positionAndVelocity.position.x)) {
-        
-        // Use FIXED GMST to convert ECI to ECF
-        // This visualizes the orbit shape frozen in time relative to Earth
-        const ecf = satellite.eciToEcf(positionAndVelocity.position, fixedGmst);
-        
-        if (ecf && typeof ecf.x === 'number' && !isNaN(ecf.x)) {
-          positions.push(new Cesium.Cartesian3(ecf.x * 1000, ecf.y * 1000, ecf.z * 1000));
-        }
-      }
-    }
-    
-    return positions;
-  } catch (error) {
-    console.error('[createOrbitPositions] Error:', error);
-    return [];
-  }
-};
-
-/**
- * Create a sampled position property for orbit visualization
- */
-const createSampledPosition = (line1, line2, startTime, duration = 90, stepMinutes = 1) => {
-  try {
-    const satrec = satellite.twoline2satrec(line1, line2);
-    const property = new Cesium.SampledPositionProperty();
-    
-    const start = Cesium.JulianDate.fromDate(startTime);
-    const totalSteps = Math.ceil(duration / stepMinutes);
-    
-    for (let i = 0; i <= totalSteps; i++) {
-      const time = Cesium.JulianDate.addMinutes(start, i * stepMinutes, new Cesium.JulianDate());
-      const jsTime = Cesium.JulianDate.toDate(time);
-      
-      const positionAndVelocity = satellite.propagate(satrec, jsTime);
-      if (positionAndVelocity.position) {
-        const gmst = satellite.gstime(jsTime);
-        const positionGd = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
-        
-        const position = Cesium.Cartesian3.fromDegrees(
-          satellite.degreesLong(positionGd.longitude),
-          satellite.degreesLat(positionGd.latitude),
-          positionGd.height * 1000
-        );
-        
-        property.addSample(time, position);
-      }
-    }
-    
-    property.setInterpolationOptions({
-      interpolationDegree: 5,
-      interpolationAlgorithm: Cesium.LagrangePolynomialApproximation,
-    });
-    
-    return property;
-  } catch (error) {
-    return null;
-  }
-};
-
-/**
  * Check if labels should be shown based on zoom
  * Following satellitemap.space: labels are ONLY shown on hover/select, never by zoom alone
  */
@@ -256,8 +147,8 @@ const shouldShowLabels = (cameraHeight) => {
 const SatelliteLayer = () => {
   const { viewer } = useCesium();
   const entitiesRef = useRef(new Map());
-  const orbitEntityRef = useRef(null);  // Separate entity for orbit polyline
-  const orbitEciPointsRef = useRef([]); // Pre-calculated ECI points for fast rotation
+  const orbitEntitiesRef = useRef(new Map());  // Map of norad_id -> orbit entity (supports multiple orbits)
+  const orbitEciPointsRef = useRef(new Map()); // Map of norad_id -> ECI points for fast rotation
   const selectionBoxRef = useRef(null); // Selection box around selected satellite
   const lastUpdateRef = useRef(0);
   const animationFrameRef = useRef(null);
@@ -267,14 +158,14 @@ const SatelliteLayer = () => {
   const pulseAnimationRef = useRef(null);  // For hover pulse animation
   const selectionPulseRef = useRef(null);  // For selected satellite pulse
   const lastSelectedIdRef = useRef(null);  // Track last selected satellite to clear styles
-
+  
   // Store state
   const selectedConstellations = useSatelliteStore(s => s.selectedConstellations);
   const constellationData = useSatelliteStore(s => s.constellationData);
   const showOrbits = useSatelliteStore(s => s.showOrbits);
   const showLabels = useSatelliteStore(s => s.showLabels);
   const selectedSatellite = useSatelliteStore(s => s.selectedSatellite);
-  const orbitSatellite = useSatelliteStore(s => s.orbitSatellite);  // For orbit display (independent of info panel)
+  const orbitSatellites = useSatelliteStore(s => s.orbitSatellites);  // Map of satellites with orbits displayed
   const selectSatellite = useSatelliteStore(s => s.selectSatellite);
   
   // Get all satellites to render with inclination colors
@@ -329,9 +220,7 @@ const SatelliteLayer = () => {
       const existingIds = new Set(entitiesRef.current.keys());
       const newIds = new Set();
       
-      // Get camera height for label display decision
-      const cameraHeight = viewer.camera.positionCartographic?.height || ZOOM_FAR;
-      const showLabelsNow = shouldShowLabels(cameraHeight);
+      // Get camera height for label display decision (currently unused, labels only shown on hover)
       currentSizeRef.current = SATELLITE_SIZE_BASE;
       
       // Skip position updates if time hasn't changed and we already have entities
@@ -416,11 +305,11 @@ const SatelliteLayer = () => {
         } else {
           // Update existing entity position if time changed
           if (shouldUpdatePositions && position) {
-            entity.position = Cesium.Cartesian3.fromDegrees(
-              position.longitude,
-              position.latitude,
-              position.height
-            );
+          entity.position = Cesium.Cartesian3.fromDegrees(
+            position.longitude,
+            position.latitude,
+            position.height
+          );
           }
           
           // Update point appearance
@@ -456,10 +345,13 @@ const SatelliteLayer = () => {
     // Force initial update
     updatePositions();
     
+    // Capture ref for cleanup
+    const currentAnimationFrame = animationFrameRef.current;
+    
     return () => {
       removeListener();
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      if (currentAnimationFrame) {
+        cancelAnimationFrame(currentAnimationFrame);
       }
     };
   }, [viewer, satellites, showOrbits, showLabels, selectedSatellite]);
@@ -546,143 +438,160 @@ const SatelliteLayer = () => {
     };
   }, [viewer, selectedSatellite]);
   
-  // Handle orbit display - INDEPENDENT of info panel
-  // Orbit remains visible even when info panel is closed
-  // Orbit is only cleared when a NEW satellite is clicked or constellation is changed
+  // Handle multiple orbit displays - supports showing many orbits simultaneously
+  // Orbits remain visible even when info panel is closed
+  // Orbits are cleared when constellation is switched (handled in store)
   useEffect(() => {
     if (!viewer) return;
     
-    let orbitUpdateInterval = null;
-    
-    const updateOrbit = () => {
-      // Remove previous orbit
-      if (orbitEntityRef.current) {
-        try {
-          viewer.entities.remove(orbitEntityRef.current);
-        } catch (e) {
-          // Entity might already be removed
+    const updateOrbits = () => {
+      // Get current orbit norad IDs from the Map
+      const currentOrbitIds = new Set(orbitSatellites.keys());
+      const existingOrbitIds = new Set(orbitEntitiesRef.current.keys());
+      
+      // Remove orbits that are no longer in the store
+      for (const noradId of existingOrbitIds) {
+        if (!currentOrbitIds.has(noradId)) {
+          const entity = orbitEntitiesRef.current.get(noradId);
+          if (entity) {
+            try {
+              viewer.entities.remove(entity);
+            } catch (e) {}
+          }
+          orbitEntitiesRef.current.delete(noradId);
+          orbitEciPointsRef.current.delete(noradId);
+          console.log('[SatelliteLayer] Removed orbit for NORAD:', noradId);
         }
-        orbitEntityRef.current = null;
       }
       
-      // Create new orbit for orbit satellite (uses orbitSatellite, not selectedSatellite)
-      console.log('[SatelliteLayer] updateOrbit called, orbitSatellite:', orbitSatellite?.name);
-      
-      if (orbitSatellite && orbitSatellite.line1 && orbitSatellite.line2) {
-        console.log('[SatelliteLayer] Creating orbit for:', orbitSatellite.name);
+      // Add new orbits
+      for (const [noradId, sat] of orbitSatellites) {
+        // Skip if already exists
+        if (orbitEntitiesRef.current.has(noradId)) continue;
+        
+        if (!sat.line1 || !sat.line2) {
+          console.warn('[SatelliteLayer] Orbit satellite missing TLE:', sat.name);
+          continue;
+        }
+        
+        console.log('[SatelliteLayer] Creating orbit for:', sat.name);
         
         // Use Cesium clock time for orbit calculation
         const currentTime = viewer.clock?.currentTime 
           ? Cesium.JulianDate.toDate(viewer.clock.currentTime)
           : new Date();
         
-        // 1. Pre-calculate ECI points (inertial)
-        // These represent the orbit shape in space, fixed relative to stars
-        const eciPoints = precalculateOrbitEci(
-          orbitSatellite.line1, 
-          orbitSatellite.line2, 
-          currentTime, // Used to center the period
-          null,
-          360
-        );
-        orbitEciPointsRef.current = eciPoints;
+        // Pre-calculate ECI points (inertial)
+        const eciPoints = precalculateOrbitEci(sat.line1, sat.line2, currentTime, null, 360);
+        orbitEciPointsRef.current.set(noradId, eciPoints);
         
         if (eciPoints.length > 2) {
-          // 2. Use CallbackProperty to rotate ECI -> ECEF in real-time
-          // This makes the orbit "move" with the Earth (or rather, Earth moves under it)
+          // Create closure to capture the norad_id for this specific orbit
+          const capturedNoradId = noradId;
+          
+          // Use CallbackProperty to rotate ECI -> ECEF in real-time
           const positionsCallback = new Cesium.CallbackProperty((time, result) => {
             const jsDate = Cesium.JulianDate.toDate(time);
             const gmst = satellite.gstime(jsDate);
+            const positions = [];
             
-            // Re-use result array if possible (optimization)
-            const positions = []; 
-            
-            const points = orbitEciPointsRef.current;
+            const points = orbitEciPointsRef.current.get(capturedNoradId) || [];
             for (let i = 0; i < points.length; i++) {
-              // Convert ECI to ECEF using CURRENT time's GMST
               const ecf = satellite.eciToEcf(points[i].position, gmst);
               if (ecf && typeof ecf.x === 'number' && !isNaN(ecf.x)) {
                 positions.push(new Cesium.Cartesian3(ecf.x * 1000, ecf.y * 1000, ecf.z * 1000));
               }
             }
             return positions;
-          }, false); // isConstant = false
+          }, false);
           
-          orbitEntityRef.current = viewer.entities.add({
-            id: `orbit-${orbitSatellite.norad_id}-${Date.now()}`,
+          // Generate color based on satellite inclination for variety
+          const inclination = sat.inclination || extractInclination(sat.line2);
+          const orbitColor = getInclinationColor(inclination).withAlpha(0.9);
+          
+          const orbitEntity = viewer.entities.add({
+            id: `orbit-${noradId}-${Date.now()}`,
             polyline: {
               positions: positionsCallback,
               width: 3,
               material: new Cesium.PolylineGlowMaterialProperty({
                 glowPower: 0.4,
-                color: Cesium.Color.CYAN.withAlpha(0.9),
+                color: orbitColor,
               }),
-              // Show the orbit even when it's behind the Earth (matches satellitemap.space feel)
               depthFailMaterial: new Cesium.PolylineGlowMaterialProperty({
                 glowPower: 0.25,
-                color: Cesium.Color.CYAN.withAlpha(0.25),
+                color: orbitColor.withAlpha(0.25),
               }),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               clampToGround: false,
             },
           });
-          console.log('[SatelliteLayer] Orbit entity created with CallbackProperty');
-          viewer.scene.requestRender();
+          
+          orbitEntitiesRef.current.set(noradId, orbitEntity);
+          console.log('[SatelliteLayer] Orbit created for:', sat.name, 'Total orbits:', orbitEntitiesRef.current.size);
         }
-      } else if (orbitSatellite) {
-        console.warn('[SatelliteLayer] Orbit satellite missing TLE data:');
-        console.warn('  - name:', orbitSatellite.name);
-        console.warn('  - norad_id:', orbitSatellite.norad_id);
-        console.warn('  - line1:', orbitSatellite.line1);
-        console.warn('  - line2:', orbitSatellite.line2);
-      } else {
-        console.log('[SatelliteLayer] No orbit satellite, orbit cleared');
       }
+      
+      viewer.scene.requestRender();
     };
     
     // Initial orbit creation
-    updateOrbit();
-    
-    // No need for interval update anymore as CallbackProperty handles animation!
+    updateOrbits();
     
     return () => {
-      // Note: We do NOT remove orbit on cleanup when selectedSatellite changes
-      // Orbit is only removed when orbitSatellite changes
-      if (orbitEntityRef.current && viewer && !viewer.isDestroyed()) {
-        try {
-          viewer.entities.remove(orbitEntityRef.current);
-        } catch (e) {
-          // Ignore removal errors
+      // Cleanup all orbits when component unmounts
+      // Copy refs to local variables for cleanup (React hooks best practice)
+      const orbitEntities = orbitEntitiesRef.current;
+      const orbitEciPoints = orbitEciPointsRef.current;
+      
+      for (const entity of orbitEntities.values()) {
+        if (viewer && !viewer.isDestroyed()) {
+          try {
+            viewer.entities.remove(entity);
+          } catch (e) {}
         }
-        orbitEntityRef.current = null;
       }
+      orbitEntities.clear();
+      orbitEciPoints.clear();
     };
-  }, [viewer, orbitSatellite]);
+  }, [viewer, orbitSatellites]);
   
   // Cleanup on unmount
   useEffect(() => {
+    // Capture refs to local variables for cleanup (React hooks best practice)
+    const entities = entitiesRef.current;
+    const orbitEntities = orbitEntitiesRef.current;
+    const orbitEciPoints = orbitEciPointsRef.current;
+    const animationFrame = animationFrameRef.current;
+    
     return () => {
-      if (viewer) {
-        for (const entity of entitiesRef.current.values()) {
-          viewer.entities.remove(entity);
+      if (viewer && !viewer.isDestroyed()) {
+        // Remove satellite entities
+        for (const entity of entities.values()) {
+          try {
+            viewer.entities.remove(entity);
+          } catch (e) {}
         }
-        entitiesRef.current.clear();
+        entities.clear();
         
-        if (orbitEntityRef.current) {
-          viewer.entities.remove(orbitEntityRef.current);
-          orbitEntityRef.current = null;
+        // Remove all orbit entities
+        for (const entity of orbitEntities.values()) {
+          try {
+            viewer.entities.remove(entity);
+          } catch (e) {}
         }
+        orbitEntities.clear();
+        orbitEciPoints.clear();
       }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
       }
     };
   }, [viewer]);
   
-  // Get setSelectedSatellite and clearOrbit for direct state update
+  // Get setSelectedSatellite and orbit functions for direct state update
   const setSelectedSatellite = useSatelliteStore(s => s.setSelectedSatellite);
-  const setOrbitSatellite = useSatelliteStore(s => s.setOrbitSatellite);
-  const clearOrbit = useSatelliteStore(s => s.clearOrbit);
+  const toggleOrbitSatellite = useSatelliteStore(s => s.toggleOrbitSatellite);
   
   // Set up click and hover handlers
   useEffect(() => {
@@ -692,6 +601,7 @@ const SatelliteLayer = () => {
     
     // Click handler - directly set satellite data to avoid API call delay
     // Use drillPick for better tolerance - picks all objects at position
+    // Supports multiple orbits: clicking toggles individual orbit on/off
     handler.setInputAction((movement) => {
       // Try regular pick first
       let pickedObject = viewer.scene.pick(movement.position);
@@ -722,41 +632,36 @@ const SatelliteLayer = () => {
           
           console.log('[SatelliteLayer] Satellite clicked:', name, 'NORAD:', noradId);
           
-          // Toggle behavior: if clicking the same satellite that already has orbit displayed, clear it
-          if (orbitSatellite && orbitSatellite.norad_id === noradId) {
-            console.log('[SatelliteLayer] Same satellite clicked - toggling orbit OFF');
-            clearOrbit();
-            // Also clear selected satellite (close info panel)
-            if (setSelectedSatellite) {
+          const satData = {
+            norad_id: noradId,
+            name: name,
+            line1: line1,
+            line2: line2,
+            inclination: inclination,
+            constellation: constellation,
+          };
+          
+          // Check if this satellite already has orbit displayed
+          const hasOrbit = orbitSatellites.has(noradId);
+          
+          if (hasOrbit) {
+            // Toggle OFF: Remove orbit line, close info panel
+            console.log('[SatelliteLayer] Toggling orbit OFF for:', name);
+            toggleOrbitSatellite(satData);
+            // Close info panel if it's showing this satellite
+            if (selectedSatellite?.norad_id === noradId) {
               setSelectedSatellite(null);
             }
           } else {
-            // Different satellite or no orbit - show orbit
-            console.log('[SatelliteLayer] TLE line1:', line1);
-            console.log('[SatelliteLayer] TLE line2:', line2);
-            
-            // Set satellite directly with TLE data for immediate orbit rendering
-            if (setSelectedSatellite) {
-              const satData = {
-                norad_id: noradId,
-                name: name,
-                line1: line1,
-                line2: line2,
-                inclination: inclination,
-                constellation: constellation,
-              };
-              console.log('[SatelliteLayer] Setting selected satellite:', satData);
-              setSelectedSatellite(satData);
-            } else {
-              // Fallback to API call
-              selectSatellite(noradId);
-            }
+            // Toggle ON: Add orbit line, show info panel
+            console.log('[SatelliteLayer] Toggling orbit ON for:', name);
+            // setSelectedSatellite also adds to orbitSatellites
+            setSelectedSatellite(satData);
           }
         }
       } else {
-        // Clicked empty space - deselect and clear orbit
-        console.log('[SatelliteLayer] Empty space clicked - clearing selection and orbit');
-        clearOrbit();
+        // Clicked empty space - only close info panel, keep orbits
+        console.log('[SatelliteLayer] Empty space clicked - closing info panel (orbits preserved)');
         if (setSelectedSatellite) {
           setSelectedSatellite(null);
         } else {
@@ -876,7 +781,7 @@ const SatelliteLayer = () => {
         pulseAnimationRef.current = null;
       }
     };
-  }, [viewer, selectSatellite, setSelectedSatellite, orbitSatellite, clearOrbit, selectedSatellite, showLabels]);
+  }, [viewer, selectSatellite, setSelectedSatellite, orbitSatellites, toggleOrbitSatellite, selectedSatellite, showLabels]);
   
   return null;
 };

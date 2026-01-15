@@ -1,4 +1,264 @@
 {
+  "common": {
+    "loading": "加载中...",
+    "noData": "暂无数据",
+    "close": "关闭",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "search": "搜索",
+    "clear": "清除",
+    "clearAll": "清除全部",
+    "reset": "重置",
+    "export": "导出",
+    "yes": "是",
+    "no": "否",
+    "on": "开启",
+    "off": "关闭",
+    "operational": "运行中",
+    "inactive": "已停用",
+    "unknown": "未知",
+    "comingSoon": "即将推出",
+    "satellites": "颗卫星",
+    "satellite": "卫星"
+  },
+
+  "nav": {
+    "about": "关于",
+    "satelliteNews": "卫星新闻",
+    "constellations": "星座",
+    "types": "类型",
+    "functions": "功能",
+    "more": "更多",
+    "share": "分享",
+    "search": "搜索卫星",
+    "install": "安装"
+  },
+
+  "types": {
+    "title": "按类型筛选",
+    "internet": "互联网",
+    "communications": "通信",
+    "globalPositioning": "全球定位",
+    "earthImaging": "地球成像",
+    "geostationary": "地球同步",
+    "spaceStations": "空间站",
+    "allActive": "全部在轨",
+    "recentLaunches": "近期发射",
+    "clearAll": "清除全部"
+  },
+
+  "functions": {
+    "title": "工具与功能",
+    "constellationData": "星座数据",
+    "visualizer": "可视化",
+    "load": "加载...",
+    "clear": "清除",
+    "clearReset": "清除/重置",
+    "exportCSV": "导出CSV",
+    "autoPlay": "自动播放",
+    "bookmarks": "书签",
+    "calculator": "计算器",
+    "train": "卫星列车",
+    "transit": "过境",
+    "interference": "干扰分析",
+    "celestial": "天体",
+    "altitudeHistory": "高度历史",
+    "reEntries": "再入轨",
+    "tleAnalysis": "TLE分析",
+    "photoSimulator": "照片模拟",
+    "conjunctionSearch": "交会搜索"
+  },
+
+  "more": {
+    "title": "更多选项",
+    "login": "登录",
+    "settings": "设置",
+    "feedback": "反馈",
+    "credits": "致谢",
+    "infoUpdates": "信息与更新",
+    "spacetrackStatus": "Space-track状态"
+  },
+
+  "constellationMenu": {
+    "title": "星座",
+    "finder": "查找器",
+    "quickSelect": "快速选择",
+    "internet": "互联网",
+    "cellular": "蜂窝网络",
+    "positioning": "定位导航",
+    "earthImaging": "地球成像",
+    "weather": "气象",
+    "science": "科学",
+    "iot": "物联网",
+    "geostationary": "地球同步",
+    "special": "特殊"
+  },
+
+  "legend": {
+    "inclination": "倾角",
+    "constellation": "星座",
+    "altitude": "轨道高度",
+    "hardwareType": "硬件类型",
+    "reentryRisk": "再入风险",
+    "orbitType": "轨道类型",
+    "equatorial": "赤道轨道",
+    "low": "低倾角",
+    "medium": "中倾角",
+    "high": "高倾角",
+    "retrograde": "逆行轨道",
+    "distribution": "分布",
+    "satellites": "颗卫星",
+    "noSelection": "未选择星座",
+    "expand": "展开",
+    "collapse": "收起",
+    "previousView": "上一视图",
+    "nextView": "下一视图",
+    "selectView": "选择视图"
+  },
+
+  "toolbar": {
+    "home": "主页 - 重置视图",
+    "rotate": "自动旋转",
+    "rotation": "地球自转",
+    "grid": "网格线",
+    "borders": "国家边界",
+    "mapView": "2D/3D视图",
+    "satellites": "卫星标签",
+    "orbits": "轨道路径",
+    "sunlight": "日照/昼夜"
+  },
+
+  "satellite": {
+    "currentPosition": "当前位置",
+    "latitude": "纬度",
+    "longitude": "经度",
+    "altitude": "高度",
+    "speed": "速度",
+    "orbitalElements": "轨道参数",
+    "inclination": "倾角",
+    "period": "周期",
+    "apogee": "远地点",
+    "perigee": "近地点",
+    "eccentricity": "离心率",
+    "meanMotion": "平均角速度",
+    "identification": "标识信息",
+    "noradCatalog": "NORAD编号",
+    "intlDesignator": "国际编号",
+    "constellation": "所属星座",
+    "altitudeHistory": "高度历史",
+    "tleData": "TLE数据",
+    "updated": "更新时间",
+    "track": "追踪",
+    "showOrbit": "显示轨道",
+    "hideOrbit": "隐藏轨道",
+    "copyTLE": "复制TLE",
+    "flyTo": "飞向卫星"
+  },
+
+  "orbitType": {
+    "geo": "地球同步轨道",
+    "meo": "中地球轨道",
+    "leo": "低地球轨道",
+    "veryLow": "极低轨道",
+    "unknown": "未知"
+  },
+
+  "inclinationType": {
+    "equatorial": "赤道",
+    "low": "低倾角",
+    "medium": "中倾角",
+    "high": "高倾角",
+    "retrograde": "逆行"
+  },
+
+  "constellationData": {
+    "title": "星座状态",
+    "growth": "增长",
+    "launches": "发射",
+    "decays": "衰减",
+    "orbits": "轨道",
+    "groundStations": "地面站",
+    "events": "事件",
+    "progress": "星座进展",
+    "appeared": "出现",
+    "decayed": "衰减",
+    "inOrbit": "在轨",
+    "launchHistory": "发射历史",
+    "launchDate": "发射日期",
+    "mission": "任务",
+    "vehicle": "火箭",
+    "site": "发射场",
+    "count": "数量",
+    "noLaunches": "暂无发射记录",
+    "decayTracking": "衰减追踪",
+    "dailyDecays": "每日衰减",
+    "cumulativeDecays": "累计衰减",
+    "decayDate": "衰减日期",
+    "noDecays": "暂无衰减记录",
+    "altitudeDistribution": "高度分布",
+    "inclinationDistribution": "倾角分布"
+  },
+
+  "calculator": {
+    "title": "计算器",
+    "altitudeHistory": "追踪卫星轨道衰减和高度随时间的变化。输入NORAD ID比较多颗卫星的轨道寿命。",
+    "enterNoradIds": "NORAD ID (逗号或换行分隔)",
+    "noradPlaceholder": "例如 25544, 48274",
+    "plot": "绘图",
+    "plotting": "绘图中...",
+    "days": "天数",
+    "noData": "输入NORAD ID并点击绘图以查看高度历史",
+    "date": "日期",
+    "altitude": "高度",
+    "trainDesc": "可视化近期发射的卫星列车在夜空中的出现",
+    "transitDesc": "计算卫星凌日天体的过境情况",
+    "interferenceDesc": "分析潜在的射频干扰",
+    "celestialDesc": "天体目标追踪与计算",
+    "altitudeDesc": "追踪轨道衰减和高度变化"
+  },
+
+  "time": {
+    "slower": "减速 / 后退",
+    "faster": "加速 / 前进",
+    "play": "播放",
+    "pause": "暂停",
+    "resetToNow": "重置到当前时间",
+    "speed": "速度"
+  },
+
+  "search": {
+    "title": "搜索卫星",
+    "placeholder": "输入卫星名称或NORAD ID...",
+    "noResults": "未找到结果",
+    "searching": "搜索中..."
+  },
+
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "dark": "深色",
+    "light": "浅色",
+    "performance": "性能",
+    "highQuality": "高质量",
+    "balanced": "平衡",
+    "performance_mode": "性能模式"
+  },
+
+  "welcome": {
+    "title": "欢迎",
+    "constellationData": "星座数据"
+  },
+
+  "units": {
+    "km": "公里",
+    "kmPerSec": "公里/秒",
+    "min": "分钟",
+    "revPerDay": "圈/天",
+    "degrees": "度"
+  },
+
   "constellationSelectorTitle": "卫星星座",
   "simulationTimeControlTitle": "时间",
   "displaySettingsTitle": "显示",
@@ -26,12 +286,11 @@
   "dayNight": "日夜",
   "dayNightDescription": "启用地球光照以呈现白天/黑夜",
   "viewMode": "视图",
-  "constellation": "星座",
   "latitude": "纬度",
   "longitude": "经度",
   "altitude": "高度",
   "speed": "速度",
-  "altitudeHistory": "高 度-时间",
+  "altitudeHistory": "高度-时间",
   "openExternalInfo": "打开外部信息",
   "orbitFollowGlobal": "跟随全局",
   "monitoringTitle": "监测",
@@ -49,70 +308,5 @@
   "companionInfoBullet2": "伴飞距离表示任意时刻的最大相对距离不应超过该值（近似处理，精确约束可通过高级解算增强）。",
   "companionInfoBullet3": "伴飞卫星仅用于仿真演示，并不存在于真实星历目录中。",
   "companionInfoBullet4": "如需更详尽的参数设定（相位、升交点、本初近地点等），可在监测模块扩展高级伴飞解算。",
-  "companionInfoFooter": "提示：可从浏览器地址栏复制本链接，分享该伴飞场景说明页面。",
-  
-  "nav": {
-    "about": "关于",
-    "satelliteNews": "卫星新闻",
-    "constellations": "星座",
-    "types": "类型",
-    "functions": "功能",
-    "more": "更多",
-    "share": "分享",
-    "search": "搜索卫星",
-    "install": "安装"
-  },
-  
-  "legend": {
-    "inclination": "倾角",
-    "equatorial": "赤道",
-    "low": "低倾角",
-    "medium": "中倾角",
-    "high": "高倾角",
-    "retrograde": "逆行",
-    "distribution": "分布",
-    "satellites": "颗卫星"
-  },
-  
-  "toolbar": {
-    "home": "主页 - 重置视图",
-    "rotate": "自动旋转",
-    "grid": "网格线",
-    "borders": "国家边界",
-    "mapView": "2D/3D视图",
-    "satellites": "卫星标签",
-    "orbits": "轨道路径",
-    "sunlight": "日照/昼夜",
-    "atmosphere": "大气光晕",
-    "groundStations": "地面站",
-    "screenshot": "截图",
-    "clouds": "云层",
-    "stars": "星空背景",
-    "record": "录制视频"
-  },
-  
-  "welcome": {
-    "title": "欢迎",
-    "constellationData": "星座数据"
-  },
-  
-  "constellationMenu": {
-    "title": "星座",
-    "finder": "查找器",
-    "internet": "互联网",
-    "cellular": "蜂窝网络",
-    "positioning": "定位",
-    "earthImaging": "地球成像",
-    "weather": "气象",
-    "science": "科学",
-    "iot": "物联网",
-    "quickSelect": "快速选择",
-    "Internet": "互联网",
-    "Cellular": "蜂窝网络",
-    "Positioning": "定位导航",
-    "Earth Imaging": "地球成像",
-    "Weather": "气象",
-    "Science": "科学",
-    "IoT": "物联网"
-  }
+  "companionInfoFooter": "提示：可从浏览器地址栏复制本链接，分享该伴飞场景说明页面。"
 }

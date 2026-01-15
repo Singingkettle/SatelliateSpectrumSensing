@@ -1,4 +1,264 @@
 {
+  "common": {
+    "loading": "Loading...",
+    "noData": "No data available",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "search": "Search",
+    "clear": "Clear",
+    "clearAll": "Clear All",
+    "reset": "Reset",
+    "export": "Export",
+    "yes": "Yes",
+    "no": "No",
+    "on": "On",
+    "off": "Off",
+    "operational": "Operational",
+    "inactive": "Inactive",
+    "unknown": "Unknown",
+    "comingSoon": "Coming Soon",
+    "satellites": "satellites",
+    "satellite": "satellite"
+  },
+
+  "nav": {
+    "about": "About",
+    "satelliteNews": "Satellite News",
+    "constellations": "Constellations",
+    "types": "Types",
+    "functions": "Functions",
+    "more": "More",
+    "share": "Share",
+    "search": "Search satellites",
+    "install": "Install"
+  },
+
+  "types": {
+    "title": "Filter by Type",
+    "internet": "Internet",
+    "communications": "Communications",
+    "globalPositioning": "Global Positioning",
+    "earthImaging": "Earth Imaging",
+    "geostationary": "Geostationary",
+    "spaceStations": "Space Stations",
+    "allActive": "All Active",
+    "recentLaunches": "Recent Launches",
+    "clearAll": "Clear All"
+  },
+
+  "functions": {
+    "title": "Tools & Functions",
+    "constellationData": "Constellation Data",
+    "visualizer": "Visualizer",
+    "load": "Load...",
+    "clear": "Clear",
+    "clearReset": "Clear/Reset",
+    "exportCSV": "Export CSV",
+    "autoPlay": "Auto Play",
+    "bookmarks": "Bookmarks",
+    "calculator": "Calculator",
+    "train": "Train",
+    "transit": "Transit",
+    "interference": "Interference",
+    "celestial": "Celestial",
+    "altitudeHistory": "Altitude History",
+    "reEntries": "Re-Entries",
+    "tleAnalysis": "TLE Analysis",
+    "photoSimulator": "Photo Simulator",
+    "conjunctionSearch": "Conjunction Search"
+  },
+
+  "more": {
+    "title": "More Options",
+    "login": "Login",
+    "settings": "Settings",
+    "feedback": "Feedback",
+    "credits": "Credits",
+    "infoUpdates": "Info & Updates",
+    "spacetrackStatus": "Space-track Status"
+  },
+
+  "constellationMenu": {
+    "title": "Constellations",
+    "finder": "Finder",
+    "quickSelect": "Quick Select",
+    "internet": "Internet",
+    "cellular": "Cellular",
+    "positioning": "Positioning",
+    "earthImaging": "Earth Imaging",
+    "weather": "Weather",
+    "science": "Science",
+    "iot": "IoT",
+    "geostationary": "Geostationary",
+    "special": "Special"
+  },
+
+  "legend": {
+    "inclination": "Inclination",
+    "constellation": "Constellation",
+    "altitude": "Orbital Altitude",
+    "hardwareType": "Hardware Type",
+    "reentryRisk": "Re-entry Risk",
+    "orbitType": "Orbit Type",
+    "equatorial": "Equatorial",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "retrograde": "Retrograde",
+    "distribution": "Distribution",
+    "satellites": "satellites",
+    "noSelection": "No constellations selected",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "previousView": "Previous view",
+    "nextView": "Next view",
+    "selectView": "Select view"
+  },
+
+  "toolbar": {
+    "home": "Home - Reset view",
+    "rotate": "Toggle auto-rotate",
+    "rotation": "Toggle Earth rotation",
+    "grid": "Toggle grid overlay",
+    "borders": "Toggle country borders",
+    "mapView": "Toggle 2D/3D view",
+    "satellites": "Toggle satellite labels",
+    "orbits": "Toggle orbit paths",
+    "sunlight": "Toggle day/night lighting"
+  },
+
+  "satellite": {
+    "currentPosition": "Current Position",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "altitude": "Altitude",
+    "speed": "Speed",
+    "orbitalElements": "Orbital Elements",
+    "inclination": "Inclination",
+    "period": "Period",
+    "apogee": "Apogee",
+    "perigee": "Perigee",
+    "eccentricity": "Eccentricity",
+    "meanMotion": "Mean Motion",
+    "identification": "Identification",
+    "noradCatalog": "NORAD Catalog #",
+    "intlDesignator": "Int'l Designator",
+    "constellation": "Constellation",
+    "altitudeHistory": "Altitude History",
+    "tleData": "TLE Data",
+    "updated": "Updated",
+    "track": "Track",
+    "showOrbit": "Show Orbit",
+    "hideOrbit": "Hide Orbit",
+    "copyTLE": "Copy TLE",
+    "flyTo": "Fly to satellite"
+  },
+
+  "orbitType": {
+    "geo": "GEO",
+    "meo": "MEO",
+    "leo": "LEO",
+    "veryLow": "Very Low",
+    "unknown": "Unknown"
+  },
+
+  "inclinationType": {
+    "equatorial": "Equatorial",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "retrograde": "Retrograde"
+  },
+
+  "constellationData": {
+    "title": "Constellation Status",
+    "growth": "Growth",
+    "launches": "Launches",
+    "decays": "Decays",
+    "orbits": "Orbits",
+    "groundStations": "Ground Stations",
+    "events": "Events",
+    "progress": "Constellation progress",
+    "appeared": "Appeared",
+    "decayed": "Decayed",
+    "inOrbit": "In Orbit",
+    "launchHistory": "Launch History",
+    "launchDate": "Launch Date",
+    "mission": "Mission",
+    "vehicle": "Vehicle",
+    "site": "Site",
+    "count": "Count",
+    "noLaunches": "No launch data available",
+    "decayTracking": "Decay Tracking",
+    "dailyDecays": "Daily Decays",
+    "cumulativeDecays": "Cumulative Decays",
+    "decayDate": "Decay Date",
+    "noDecays": "No decay data available",
+    "altitudeDistribution": "Altitude Distribution",
+    "inclinationDistribution": "Inclination Distribution"
+  },
+
+  "calculator": {
+    "title": "Calculators",
+    "altitudeHistory": "Track satellite orbital decay and altitude changes over time. Enter NORAD IDs to compare orbital lifetimes.",
+    "enterNoradIds": "NORAD ID(s) (comma or newline separated)",
+    "noradPlaceholder": "e.g. 25544, 48274",
+    "plot": "Plot",
+    "plotting": "Plotting...",
+    "days": "Days",
+    "noData": "Enter NORAD ID(s) and click Plot to view altitude history.",
+    "date": "Date",
+    "altitude": "Altitude",
+    "trainDesc": "Visualize recently launched satellite trains in the night sky",
+    "transitDesc": "Calculate satellite transits across celestial objects",
+    "interferenceDesc": "Analyze potential RF interference",
+    "celestialDesc": "Celestial object tracking and calculations",
+    "altitudeDesc": "Track orbital decay and altitude changes over time"
+  },
+
+  "time": {
+    "slower": "Slower / Rewind",
+    "faster": "Faster / Forward",
+    "play": "Play",
+    "pause": "Pause",
+    "resetToNow": "Reset to current time",
+    "speed": "Speed"
+  },
+
+  "search": {
+    "title": "Search Satellites",
+    "placeholder": "Enter satellite name or NORAD ID...",
+    "noResults": "No results found",
+    "searching": "Searching..."
+  },
+
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "performance": "Performance",
+    "highQuality": "High Quality",
+    "balanced": "Balanced",
+    "performance_mode": "Performance"
+  },
+
+  "welcome": {
+    "title": "Welcome",
+    "constellationData": "Constellation Data"
+  },
+
+  "units": {
+    "km": "km",
+    "kmPerSec": "km/s",
+    "min": "min",
+    "revPerDay": "rev/day",
+    "degrees": "°"
+  },
+
   "constellationSelectorTitle": "Constellations",
   "simulationTimeControlTitle": "Time",
   "displaySettingsTitle": "Display",
@@ -26,7 +286,6 @@
   "dayNight": "Day/Night",
   "dayNightDescription": "Enable globe lighting to render day/night",
   "viewMode": "View",
-  "constellation": "Constellation",
   "latitude": "Lat",
   "longitude": "Lon",
   "altitude": "Alt",
@@ -49,63 +308,5 @@
   "companionInfoBullet2": "The companion distance is an upper bound for the relative separation at any time (approximate; exact constraints require advanced solving).",
   "companionInfoBullet3": "The companion satellite is for simulation only and does not exist in public catalogs.",
   "companionInfoBullet4": "For richer control (phase, RAAN, argument of perigee), extend the monitoring module with advanced co-orbit solving.",
-  "companionInfoFooter": "Tip: You can share this page by copying the URL from the browser address bar.",
-  
-  "nav": {
-    "about": "About",
-    "satelliteNews": "Satellite News",
-    "constellations": "Constellations",
-    "types": "Types",
-    "functions": "Functions",
-    "more": "More",
-    "share": "Share",
-    "search": "Search satellites",
-    "install": "Install"
-  },
-  
-  "legend": {
-    "inclination": "Inclination",
-    "equatorial": "Equatorial",
-    "low": "Low",
-    "medium": "Medium",
-    "high": "High",
-    "retrograde": "Retrograde",
-    "distribution": "Distribution",
-    "satellites": "satellites"
-  },
-  
-  "toolbar": {
-    "home": "Home - Reset view",
-    "rotate": "Toggle auto-rotate",
-    "grid": "Toggle grid overlay",
-    "borders": "Toggle country borders",
-    "mapView": "Toggle 2D/3D view",
-    "satellites": "Toggle satellite labels",
-    "orbits": "Toggle orbit paths",
-    "sunlight": "Toggle day/night lighting",
-    "atmosphere": "Toggle atmosphere glow",
-    "groundStations": "Toggle ground stations",
-    "screenshot": "Take screenshot",
-    "clouds": "Toggle cloud layer",
-    "stars": "Toggle star background",
-    "record": "Record video"
-  },
-  
-  "welcome": {
-    "title": "Welcome",
-    "constellationData": "Constellation Data"
-  },
-  
-  "constellationMenu": {
-    "title": "Constellations",
-    "finder": "Finder",
-    "internet": "Internet",
-    "cellular": "Cellular",
-    "positioning": "Positioning",
-    "earthImaging": "Earth Imaging",
-    "weather": "Weather",
-    "science": "Science",
-    "iot": "IoT",
-    "quickSelect": "Quick Select"
-  }
+  "companionInfoFooter": "Tip: You can share this page by copying the URL from the browser address bar."
 }

@@ -3,23 +3,18 @@
  * Displays growth charts, launch history, decay tracking, orbits, and ground stations
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUiStore } from '../../store/uiStore';
 import { useSatelliteStore } from '../../store/satelliteStore';
 import GrowthChart from './GrowthChart';
 import LaunchHistory from './LaunchHistory';
+import DecayTracking from './DecayTracking';
+import OrbitData from './OrbitData';
+import { ensureConstellationData } from '../../api/satelliteApi';
 import '../../styles/ConstellationDataModal.css';
 
-// Tab definitions
-const TABS = [
-  { id: 'growth', name: 'Growth', icon: '📈' },
-  { id: 'launches', name: 'Launches', icon: '🚀' },
-  { id: 'decays', name: 'Decays', icon: '🔥' },
-  { id: 'orbits', name: 'Orbits', icon: '🌐' },
-  { id: 'ground-stations', name: 'Ground Stations', icon: '📡' },
-  { id: 'events', name: 'Events', icon: '📅' },
-];
-
 const ConstellationDataModal = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('growth');
   const [selectedConstellation, setSelectedConstellation] = useState('starlink');
   
@@ -28,6 +23,16 @@ const ConstellationDataModal = () => {
   const selectedConstellations = useSatelliteStore(s => s.selectedConstellations);
   const constellations = useSatelliteStore(s => s.constellations);
   const fetchConstellations = useSatelliteStore(s => s.fetchConstellations);
+  
+  // Tab definitions with translation keys
+  const TABS = [
+    { id: 'growth', nameKey: 'constellationData.growth', icon: '📈' },
+    { id: 'launches', nameKey: 'constellationData.launches', icon: '🚀' },
+    { id: 'decays', nameKey: 'constellationData.decays', icon: '🔥' },
+    { id: 'orbits', nameKey: 'constellationData.orbits', icon: '🌐' },
+    { id: 'ground-stations', nameKey: 'constellationData.groundStations', icon: '📡' },
+    { id: 'events', nameKey: 'constellationData.events', icon: '📅' },
+  ];
   
   const handleClose = useCallback(() => {
     setShowConstellationData(false);
@@ -58,6 +63,20 @@ const ConstellationDataModal = () => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleClose]);
+
+  // Ensure historical data exists when opening the modal or switching constellations
+  useEffect(() => {
+    if (!showConstellationData || !selectedConstellation) return;
+    const runEnsure = async () => {
+      try {
+        await ensureConstellationData(selectedConstellation, 3650);
+      } catch (error) {
+        // Non-blocking: UI still loads with whatever data is available
+        console.warn('Failed to ensure constellation data', error);
+      }
+    };
+    runEnsure();
+  }, [showConstellationData, selectedConstellation]);
   
   if (!showConstellationData) return null;
   
@@ -72,9 +91,9 @@ const ConstellationDataModal = () => {
       case 'orbits':
         return <OrbitData constellation={selectedConstellation} />;
       case 'ground-stations':
-        return <GroundStationsView constellation={selectedConstellation} />;
+        return <GroundStationsView constellation={selectedConstellation} t={t} />;
       case 'events':
-        return <EventsView constellation={selectedConstellation} />;
+        return <EventsView constellation={selectedConstellation} t={t} />;
       default:
         return null;
     }
@@ -85,7 +104,7 @@ const ConstellationDataModal = () => {
       {/* Header */}
       <div className="cdm-header">
         <div className="cdm-title">
-          <span className="cdm-label">Constellation Status:</span>
+          <span className="cdm-label">{t('constellationData.title')}:</span>
           <select 
             className="cdm-select"
             value={selectedConstellation}
@@ -121,7 +140,7 @@ const ConstellationDataModal = () => {
             className={`cdm-tab ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            {tab.name}
+            {t(tab.nameKey)}
           </button>
         ))}
       </div>
@@ -135,31 +154,17 @@ const ConstellationDataModal = () => {
 };
 
 // Placeholder components for tabs
-const DecayTracking = ({ constellation }) => (
+const GroundStationsView = ({ constellation, t }) => (
   <div className="cdm-placeholder">
-    <h3>Decay Tracking - {constellation}</h3>
-    <p>Tracking satellite re-entry events and decay predictions</p>
+    <h3>{t('constellationData.groundStations')} - {constellation}</h3>
+    <p>{t('common.comingSoon')}</p>
   </div>
 );
 
-const OrbitData = ({ constellation }) => (
+const EventsView = ({ constellation, t }) => (
   <div className="cdm-placeholder">
-    <h3>Orbital Data - {constellation}</h3>
-    <p>Orbit visualization and parameters</p>
-  </div>
-);
-
-const GroundStationsView = ({ constellation }) => (
-  <div className="cdm-placeholder">
-    <h3>Ground Stations - {constellation}</h3>
-    <p>Ground station locations and coverage</p>
-  </div>
-);
-
-const EventsView = ({ constellation }) => (
-  <div className="cdm-placeholder">
-    <h3>Events - {constellation}</h3>
-    <p>Recent and upcoming events</p>
+    <h3>{t('constellationData.events')} - {constellation}</h3>
+    <p>{t('common.comingSoon')}</p>
   </div>
 );
 

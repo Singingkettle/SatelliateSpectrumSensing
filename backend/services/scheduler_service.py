@@ -120,6 +120,26 @@ def sync_external_satellites_job():
                 print(f"[Scheduler] External sync error for {slug}: {e}")
 
 
+def backfill_history_job():
+    """
+    Background job to backfill historical TLE data (last 1 year).
+    Runs once daily at off-peak time.
+    """
+    from services.tle_service import tle_service
+    from app import app
+    
+    print("--- [Scheduler] Starting History Backfill ---")
+    with app.app_context():
+        try:
+            # Iterate through all configured constellations
+            for slug in tle_service.constellations.keys():
+                tle_service.sync_constellation_history(slug, days=365)
+        except Exception as e:
+            print(f"[Scheduler] History backfill error: {e}")
+    print("--- [Scheduler] History Backfill Complete ---")
+
+
+
 def get_scheduler_status():
     """Get current scheduler status and statistics."""
     return {
@@ -192,11 +212,24 @@ def initialize_scheduler(app):
         replace_existing=True
     )
     
+    # Daily history backfill at 02:27 UTC (off-peak)
+    # Checks for missing history and fills gaps from Space-Track
+    scheduler.add_job(
+        backfill_history_job,
+        'cron',
+        hour=2,
+        minute=27,
+        timezone='utc',
+        id='history_backfill',
+        replace_existing=True
+    )
+    
     scheduler.start()
     print(f"[Scheduler] Started with Space-Track compliant schedule:")
     print(f"  - Full update: every 6h at :17 (03:17, 09:17, 15:17, 21:17 UTC)")
     print(f"  - Priority update: every 2h at :42 (uses CelesTrak)")
     print(f"  - External sync: every 6h at :47 (uses api2.satellitemap.space)")
+    print(f"  - History backfill: daily at 02:27 UTC (uses Space-Track bulk API)")
 
 
 def shutdown_scheduler():

@@ -34,6 +34,7 @@ export const useUiStore = create((set, get) => ({
   showGrid: false,          // Globe grid lines
   showBorders: true,        // Country borders (like satellitemap.space)
   showClouds: false,        // Cloud layer overlay
+  earthRotation: true,      // Earth auto-rotation (like satellitemap.space)
   
   // UI visibility
   showTimeline: false,
@@ -102,6 +103,9 @@ export const useUiStore = create((set, get) => ({
   
   setShowClouds: (show) => set({ showClouds: show }),
   toggleClouds: () => set(state => ({ showClouds: !state.showClouds })),
+  
+  setEarthRotation: (enabled) => set({ earthRotation: enabled }),
+  toggleEarthRotation: () => set(state => ({ earthRotation: !state.earthRotation })),
   
   setShowTimeline: (show) => set({ showTimeline: show }),
   setShowAnimation: (show) => set({ showAnimation: show }),

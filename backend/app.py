@@ -46,11 +46,13 @@ def create_app(config_name=None):
     from routes.satellite_routes import satellite_bp
     from routes.ground_station_routes import ground_station_bp
     from routes.spacetrack_routes import spacetrack_bp
+    from routes.statistics_routes import statistics_bp
     
     app.register_blueprint(constellation_bp)
     app.register_blueprint(satellite_bp)
     app.register_blueprint(ground_station_bp)
     app.register_blueprint(spacetrack_bp)
+    app.register_blueprint(statistics_bp)
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])
@@ -68,13 +70,14 @@ def create_app(config_name=None):
     def api_info():
         """API information and available endpoints."""
         return jsonify({
-            'name': 'Satellite Tracker API',
+            'name': 'ChangShuoSpace API',
             'version': '2.0.0',
             'data_source': 'space-track.org (via CelesTrak mirror)',
             'endpoints': {
                 'constellations': '/api/constellations',
                 'satellites': '/api/satellites',
                 'ground_stations': '/api/ground-stations',
+                'statistics': '/api/statistics',
                 'scheduler': '/api/scheduler/status',
                 'health': '/api/health',
             }
@@ -123,11 +126,19 @@ def init_database():
 
 
 def start_scheduler():
-    """Start background scheduler for TLE updates."""
+    """Start background scheduler and services."""
     from services.scheduler_service import initialize_scheduler, shutdown_scheduler
+    from services.tle_service import tle_service
     
     initialize_scheduler(app)
     atexit.register(shutdown_scheduler)
+    
+    # Perform TLE service startup check (restore cache, check history)
+    with app.app_context():
+        try:
+            tle_service.startup_check()
+        except Exception as e:
+            print(f"[Startup] Error during TLE service check: {e}")
 
 
 if __name__ == '__main__':
@@ -139,7 +150,7 @@ if __name__ == '__main__':
     
     # Run the application
     print("=" * 50)
-    print("Satellite Tracker API Server")
+    print("ChangShuoSpace API Server")
     print("=" * 50)
     print(f"Server running at: http://localhost:6359")
     print(f"API documentation: http://localhost:6359/api")

@@ -3,10 +3,12 @@
  * Provides quick links to constellation data and settings
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUiStore } from '../../store/uiStore';
 import '../../styles/WelcomePanel.css';
 
 const WelcomePanel = () => {
+  const { t } = useTranslation();
   const setShowWelcomePanel = useUiStore(s => s.setShowWelcomePanel);
   const setShowConstellationData = useUiStore(s => s.setShowConstellationData);
   
@@ -22,11 +24,11 @@ const WelcomePanel = () => {
   return (
     <div className="welcome-panel animate-fadeIn">
       <div className="welcome-header">
-        <h3 className="welcome-title">Welcome</h3>
+        <h3 className="welcome-title">{t('welcome.title')}</h3>
         <button 
           className="welcome-close"
           onClick={handleClose}
-          title="Close"
+          title={t('common.close')}
         >
           ✕
         </button>
@@ -41,7 +43,7 @@ const WelcomePanel = () => {
             handleConstellationData();
           }}
         >
-          Constellation Data
+          {t('welcome.constellationData')}
         </a>
       </div>
     </div>

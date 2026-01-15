@@ -25,20 +25,26 @@ class Config:
         'pool_pre_ping': True,
     }
     
-    # Redis
-    REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
-    REDIS_PORT = int(os.environ.get('REDIS_PORT', 6379))
-    REDIS_DB = int(os.environ.get('REDIS_DB', 0))
-    
-    # TLE Cache settings
+    # TLE Cache settings (used for SQLite-based caching)
     TLE_CACHE_EXPIRY = int(os.environ.get('TLE_CACHE_EXPIRY', 86400))  # 24 hours
+
+    # History settings (days)
+    HISTORY_DAYS_DEFAULT = int(os.environ.get('HISTORY_DAYS_DEFAULT', 365))
     
     # Space-Track.org API (Primary data source)
     # Documentation: https://www.space-track.org/documentation
     # IMPORTANT: Set these via environment variables, never commit credentials!
     SPACETRACK_URL = 'https://www.space-track.org'
+    # Primary account (defaults to environment variable or fallback)
     SPACETRACK_USERNAME = os.environ.get('SPACETRACK_USERNAME', 'changshuo@bupt.edu.cn')
     SPACETRACK_PASSWORD = os.environ.get('SPACETRACK_PASSWORD', 'Heitong1234....')
+    
+    # Account Pool for failover
+    # The service will rotate through these if one is suspended or rate limited
+    SPACETRACK_ACCOUNTS = [
+        {'username': '971470200@qq.com', 'password': 'Heitong1234....'},
+        {'username': SPACETRACK_USERNAME, 'password': SPACETRACK_PASSWORD}
+    ]
     
     # CelesTrak API URLs (Backup/mirror source)
     CELESTRAK_BASE_URL = 'https://celestrak.org/NORAD/elements/gp.php'
@@ -253,15 +259,15 @@ class Config:
         # === Additional Cellular/Direct-to-Device ===
         'bluewalker': {
             'name': 'Bluewalker (AST)',
-            'group': 'bluewalker',
-            'spacetrack_query': "OBJECT_NAME~~BLUEWALKER,OBJECT_NAME~~AST",
+            'group': 'ast',  # CelesTrak uses 'ast' for AST SpaceMobile
+            'spacetrack_query': "OBJECT_NAME~~BLUEWALKER,OBJECT_NAME~~AST SPACE",
             'description': 'AST SpaceMobile direct-to-cell satellite constellation',
             'color': '#1565C0',
             'category': 'cellular',
         },
         'lynk': {
             'name': 'Lynk',
-            'group': 'lynk',
+            'group': 'other-comm',  # Lynk satellites are in other-comm group
             'spacetrack_query': "OBJECT_NAME~~LYNK",
             'description': 'Lynk Global satellite-to-phone constellation',
             'color': '#0097A7',

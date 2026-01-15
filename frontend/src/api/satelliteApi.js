@@ -72,7 +72,8 @@ export const getConstellationStats = (slug) => {
  * @returns {Promise} Launch history
  */
 export const getConstellationLaunches = (slug, params = {}) => {
-  return apiClient.get(`/constellations/${slug}/launches`, { params });
+  // Statistics service endpoint
+  return apiClient.get(`/statistics/constellation/${slug}/launches`, { params });
 };
 
 /**
@@ -82,7 +83,55 @@ export const getConstellationLaunches = (slug, params = {}) => {
  * @returns {Promise} Growth data
  */
 export const getConstellationGrowth = (slug, period = 'year') => {
-  return apiClient.get(`/constellations/${slug}/growth`, { params: { period } });
+  // Statistics service endpoint
+  // Note: period is currently ignored by backend; kept for future parity
+  return apiClient.get(`/statistics/constellation/${slug}/growth`, { params: { period } });
+};
+
+/**
+ * Get decay/re-entry history for a constellation
+ * @param {string} slug - Constellation slug
+ * @returns {Promise} Decay list
+ */
+export const getConstellationDecays = (slug) => {
+  return apiClient.get(`/statistics/constellation/${slug}/decays`);
+};
+
+/**
+ * Ensure historical data is backfilled for a constellation
+ * @param {string} slug - Constellation slug
+ * @param {number} days - History days to backfill (default: 365)
+ * @returns {Promise} Backfill results
+ */
+export const ensureConstellationData = (slug, days = 365) => {
+  return apiClient.post(`/statistics/constellation/${slug}/ensure-data`, null, { params: { days } });
+};
+
+/**
+ * Get altitude distribution for a constellation
+ * @param {string} slug - Constellation slug
+ * @returns {Promise} Altitude histogram data
+ */
+export const getConstellationAltitudeDistribution = (slug) => {
+  return apiClient.get(`/statistics/constellation/${slug}/altitude-distribution`);
+};
+
+/**
+ * Get inclination distribution for a constellation
+ * @param {string} slug - Constellation slug
+ * @returns {Promise} Inclination histogram data
+ */
+export const getConstellationInclinationDistribution = (slug) => {
+  return apiClient.get(`/statistics/constellation/${slug}/inclination-distribution`);
+};
+
+/**
+ * Get altitude/decay history for a specific satellite (statistics service)
+ * @param {number} noradId - NORAD catalog ID
+ * @returns {Promise} Altitude history points
+ */
+export const getSatelliteDecayHistory = (noradId) => {
+  return apiClient.get(`/statistics/satellite/${noradId}/decay`);
 };
 
 /**
@@ -199,6 +248,16 @@ export const getSatellitePasses = (noradId, observer, days = 7) => {
       days,
     },
   });
+};
+
+/**
+ * Trigger history backfill for a specific satellite
+ * @param {number} noradId - NORAD catalog ID
+ * @param {number} days - Days to backfill (default: 3650)
+ * @returns {Promise} Sync result
+ */
+export const syncSatelliteHistory = (noradId, days = 3650) => {
+  return apiClient.post(`/satellites/${noradId}/sync-history`, null, { params: { days } });
 };
 
 /**
@@ -373,6 +432,10 @@ export const satelliteApi = {
   getConstellationStats,
   getConstellationLaunches,
   getConstellationGrowth,
+  getConstellationDecays,
+  ensureConstellationData,
+  getConstellationAltitudeDistribution,
+  getConstellationInclinationDistribution,
   updateConstellationTLE,
   updateAllConstellationsTLE,
   // Satellites
@@ -383,6 +446,7 @@ export const satelliteApi = {
   getSatellitePosition,
   getSatelliteOrbit,
   getSatelliteHistory,
+  getSatelliteDecayHistory,
   getSatellitePasses,
   getAllTLE,
   // Ground Stations

@@ -11,9 +11,6 @@ Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.5
 # psycopg2-binary==2.9.9  # Uncomment for PostgreSQL support
 
-# Redis Cache
-redis==5.0.1
-
 # HTTP Requests
 requests==2.31.0
 

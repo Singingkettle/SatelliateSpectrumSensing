@@ -120,7 +120,7 @@ const applySpaceTheme = (viewer) => {
   scene.postProcessStages.fxaa.enabled = true;
 
   // Set time to current and start animation
-  viewer.clock.currentTime = Cesium.JulianDate.now();
+    viewer.clock.currentTime = Cesium.JulianDate.now();
   viewer.clock.shouldAnimate = true;
   viewer.clock.multiplier = 1.0;
   // Ensure clock advances using system time and multiplier
@@ -328,7 +328,7 @@ const CesiumGlobe = () => {
     
     // Add a small delay to ensure Cesium viewer is fully ready
     const initTimer = setTimeout(() => {
-      const viewer = viewerRef.current?.cesiumElement;
+    const viewer = viewerRef.current?.cesiumElement;
       if (!viewer) {
         console.log('[CesiumGlobe] Viewer not ready yet');
         return;
@@ -339,29 +339,29 @@ const CesiumGlobe = () => {
       }
       
       console.log('[CesiumGlobe] Starting initialization...');
-      initRef.current = true;
-      
-      // Set initial camera position
-      viewer.camera.setView(INITIAL_CAMERA);
-      
-      // Apply space theme
-      applySpaceTheme(viewer);
-      
+    initRef.current = true;
+    
+    // Set initial camera position
+    viewer.camera.setView(INITIAL_CAMERA);
+    
+    // Apply space theme
+    applySpaceTheme(viewer);
+    
       // Apply dark imagery (simple dark globe - sets ocean color)
-      applyDarkImagery(viewer);
+    applyDarkImagery(viewer);
       
       // Add country borders and coastlines (loaded async)
       // Coastlines clearly distinguish land from ocean
       addCountryBorders(viewer, borderDataSourceRef);
-      
-      // Add grid lines
-      addGridLines(viewer);
-      
+    
+    // Add grid lines
+    addGridLines(viewer);
+    
       // Optimize for high-DPI displays and performance
-      if (window.devicePixelRatio > 1.5) {
-        viewer.resolutionScale = 0.85;
-      }
-      
+    if (window.devicePixelRatio > 1.5) {
+      viewer.resolutionScale = 0.85;
+    }
+    
       // Performance optimizations for large constellations
       const scene = viewer.scene;
       scene.globe.tileCacheSize = 100;
@@ -474,14 +474,36 @@ const CesiumGlobe = () => {
       }
     };
     
+    // Handle Earth rotation toggle (slow auto-spin of globe)
+    const handleToggleEarthRotation = () => {
+      const viewer = viewerRef.current?.cesiumElement;
+      if (!viewer) return;
+      
+      // Toggle rotation state
+      if (autoRotateRef.current) {
+        // Currently rotating - stop it
+        clearInterval(autoRotateRef.current);
+        autoRotateRef.current = null;
+      } else {
+        // Not rotating - start slow rotation
+        const rotateAmount = 0.1; // degrees per frame (slow rotation)
+        autoRotateRef.current = setInterval(() => {
+          viewer.camera.rotateRight(Cesium.Math.toRadians(rotateAmount / 60));
+          viewer.scene.requestRender();
+        }, 16); // ~60fps
+      }
+    };
+    
     window.addEventListener('resetCameraView', handleResetCamera);
     window.addEventListener('takeScreenshot', handleScreenshot);
     window.addEventListener('toggleAutoRotate', handleToggleAutoRotate);
+    window.addEventListener('toggleEarthRotation', handleToggleEarthRotation);
     
     return () => {
       window.removeEventListener('resetCameraView', handleResetCamera);
       window.removeEventListener('takeScreenshot', handleScreenshot);
       window.removeEventListener('toggleAutoRotate', handleToggleAutoRotate);
+      window.removeEventListener('toggleEarthRotation', handleToggleEarthRotation);
       
       // Clean up auto-rotate
       if (autoRotateRef.current) {

@@ -132,6 +132,12 @@ Frontend runs at `http://localhost:3000`
 - `GET /api/satellites/<norad_id>/history` - Get TLE history
 - `GET /api/satellites/<norad_id>/passes` - Predict passes
 
+### Statistics (New)
+- `GET /api/statistics/constellation/<slug>/summary` - Constellation summary
+- `GET /api/statistics/constellation/<slug>/altitude-distribution` - Altitude distribution histogram
+- `GET /api/statistics/constellation/<slug>/inclination-distribution` - Inclination distribution histogram
+- `GET /api/statistics/satellite/<norad_id>/decay` - Satellite orbital decay history
+
 ### Ground Stations
 - `GET /api/ground-stations` - List ground stations
 - `POST /api/ground-stations` - Create ground station

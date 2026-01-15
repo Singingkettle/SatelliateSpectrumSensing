@@ -369,6 +369,28 @@ def get_satellite_passes(norad_id):
     })
 
 
+@satellite_bp.route('/<int:norad_id>/sync-history', methods=['POST'])
+def sync_satellite_history(norad_id):
+    """
+    Trigger backfill of TLE history for a specific satellite.
+    Creates the satellite if it doesn't exist.
+    """
+    days = request.args.get('days', 3650, type=int) # Default 10 years for manual check
+    
+    try:
+        from services.tle_service import tle_service
+        count = tle_service.sync_satellite_history(norad_id, days=days)
+        return jsonify({
+            'status': 'success',
+            'norad_id': norad_id,
+            'history_records_added': count
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @satellite_bp.route('/all-tle', methods=['GET'])
 def get_all_tle():
     """
