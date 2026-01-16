@@ -498,27 +498,44 @@ class TLEService:
     HISTORY_DELAY_BETWEEN_BATCHES = 60  # 1 minute between batches
     HISTORY_DELAY_BETWEEN_CHUNKS = 120  # 2 minutes between time chunks
 
+    # History data cutoff: Data up to end of 2025 is imported from cloud storage.
+    # Only use GP_HISTORY API for data from 2026 onwards.
+    HISTORY_API_START_DATE = datetime(2026, 1, 1)
+
     def sync_constellation_history(self, constellation_slug: str, days: int = None,
                                    max_batches: int = None) -> Dict:
         """
         Incrementally backfill historical TLE data for a constellation.
         
+        IMPORTANT: Data up to end of 2025 should be imported from Space-Track cloud storage
+        (use scripts/import_history_from_zip.py). This API method only fetches data from
+        2026 onwards to comply with Space-Track's recommendation.
+        
         This method is designed to be called repeatedly until all history is downloaded:
-        1. Finds satellites that need history data
+        1. Finds satellites that need history data (from 2026-01-01 onwards)
         2. Downloads in small batches to respect API limits
         3. Tracks progress so we can resume if interrupted
         4. Already downloaded data is never re-downloaded
         
         Args:
             constellation_slug: Constellation identifier
-            days: Number of days of history to target (default: 3 years)
+            days: Number of days of history to target (default: since 2026-01-01)
             max_batches: Maximum number of batches to process in this call (default: unlimited)
         
         Returns:
             Dict with backfill status and statistics
         """
-        # Default to 3 years of history
-        days = days or (365 * 3)
+        # Calculate days since API start date (2026-01-01)
+        now = datetime.utcnow()
+        days_since_api_start = (now - self.HISTORY_API_START_DATE).days
+        
+        # If days is specified but extends before 2026, cap it
+        if days:
+            max_api_days = max(0, days_since_api_start)
+            if days > max_api_days:
+                days = max_api_days
+        else:
+            days = max(0, days_since_api_start)
         
         result = {
             'constellation': constellation_slug,
@@ -527,8 +544,15 @@ class TLEService:
             'satellites_processed': 0,
             'satellites_remaining': 0,
             'progress_percent': 0,
-            'message': ''
+            'message': '',
+            'note': 'API only fetches data from 2026-01-01. Pre-2026 data should be imported from cloud storage.'
         }
+        
+        # If we're before 2026, nothing to fetch via API
+        if days <= 0:
+            result['status'] = 'complete'
+            result['message'] = 'No data to fetch - current date is before 2026-01-01'
+            return result
         
         constellation = Constellation.query.filter_by(slug=constellation_slug).first()
         if not constellation:
@@ -544,11 +568,12 @@ class TLEService:
             return result
         
         total_satellites = len(satellites)
-        target_start = datetime.utcnow() - timedelta(days=days)
+        # Only fetch from 2026-01-01 onwards
+        target_start = max(self.HISTORY_API_START_DATE, now - timedelta(days=days))
         
         print(f"[TLEService] === History Backfill for {constellation_slug} ===", flush=True)
         print(f"[TLEService] Total satellites: {total_satellites}", flush=True)
-        print(f"[TLEService] Target date range: {target_start.date()} to {datetime.utcnow().date()}", flush=True)
+        print(f"[TLEService] API date range: {target_start.date()} to {now.date()} (pre-2026 data from cloud storage)", flush=True)
         
         # Find satellites needing history and determine their required date ranges
         satellites_needing_history = []
@@ -690,6 +715,10 @@ class TLEService:
         Get the current status of history backfill for a constellation.
         Does NOT trigger any downloads.
         
+        Reports both:
+        - Cloud storage data status (pre-2026, imported via script)
+        - API data status (2026 onwards, fetched via scheduler)
+        
         Returns:
             Dict with backfill progress information
         """
@@ -703,38 +732,74 @@ class TLEService:
         if not satellites:
             return {'error': 'No satellites in constellation', 'total': 0}
         
-        target_start = datetime.utcnow() - timedelta(days=days)
+        now = datetime.utcnow()
+        target_start = now - timedelta(days=days)
         
-        complete = 0
-        partial = 0
+        # Separate tracking for cloud storage (pre-2026) and API (2026+)
+        cloud_complete = 0  # Has data before 2026
+        api_complete = 0    # Has data from 2026 onwards
+        has_any_history = 0
         none = 0
+        
+        total_history_records = 0
         
         for sat in satellites:
             history_count = TLEHistory.query.filter_by(satellite_id=sat.id).count()
+            total_history_records += history_count
             
             if history_count == 0:
                 none += 1
             else:
+                has_any_history += 1
+                
+                # Check oldest record (cloud storage completeness)
                 oldest = TLEHistory.query.filter_by(satellite_id=sat.id)\
                     .order_by(TLEHistory.epoch.asc()).first()
                 
-                if oldest.epoch <= target_start + timedelta(days=7):
-                    complete += 1
-                else:
-                    partial += 1
+                # Check newest record (API completeness)
+                newest = TLEHistory.query.filter_by(satellite_id=sat.id)\
+                    .order_by(TLEHistory.epoch.desc()).first()
+                
+                # Cloud storage complete if we have data from before 2026
+                if oldest and oldest.epoch < self.HISTORY_API_START_DATE:
+                    cloud_complete += 1
+                
+                # API complete if we have recent data (within last 7 days)
+                if newest and newest.epoch > now - timedelta(days=7):
+                    api_complete += 1
         
         total = len(satellites)
+        
+        # Calculate overall progress
+        # Cloud data weight: 80% (bulk of historical data)
+        # API data weight: 20% (recent updates)
+        cloud_progress = (cloud_complete / total * 80) if total > 0 else 0
+        api_progress = (api_complete / total * 20) if total > 0 else 0
+        overall_progress = round(cloud_progress + api_progress, 1)
         
         return {
             'constellation': constellation_slug,
             'total_satellites': total,
-            'history_complete': complete,
-            'history_partial': partial,
-            'history_none': none,
-            'progress_percent': round(complete / total * 100, 1) if total > 0 else 0,
+            'total_history_records': total_history_records,
+            'satellites_with_history': has_any_history,
+            'satellites_no_history': none,
+            'cloud_storage': {
+                'description': 'Pre-2026 data (from Space-Track cloud storage)',
+                'complete': cloud_complete,
+                'pending': total - cloud_complete,
+                'note': 'Import using: python scripts/import_history_from_zip.py'
+            },
+            'api_data': {
+                'description': '2026+ data (from GP_HISTORY API)',
+                'complete': api_complete,
+                'pending': total - api_complete,
+                'note': 'Fetched automatically by scheduler'
+            },
+            'progress_percent': overall_progress,
             'target_days': days,
             'target_start_date': target_start.date().isoformat(),
-            'is_complete': complete == total
+            'api_start_date': self.HISTORY_API_START_DATE.date().isoformat(),
+            'is_complete': cloud_complete == total and api_complete == total
         }
 
     def _save_history_data(self, history_data: List[Dict], 
