@@ -150,3 +150,26 @@ def get_tle_for_satellite(norad_id):
         return jsonify({'error': 'TLE not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@spacetrack_bp.route('/test', methods=['GET'])
+def test_api_formats():
+    """
+    Test different Space-Track API query formats.
+    
+    This endpoint helps diagnose API connectivity issues by trying
+    multiple URL formats and reporting which ones work.
+    
+    Query params:
+    - name: Test satellite name (default: STARLINK-1)
+    """
+    test_name = request.args.get('name', 'STARLINK-1')
+    
+    try:
+        results = spacetrack_service.test_query_format(test_name)
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'tests': []
+        }), 500

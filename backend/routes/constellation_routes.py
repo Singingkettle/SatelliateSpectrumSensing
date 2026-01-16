@@ -114,22 +114,33 @@ def get_constellation_satellites(slug):
     Query parameters:
     - limit: Maximum number of satellites to return (default: 1000)
     - offset: Offset for pagination (default: 0)
+    - include_decayed: If true, include decayed satellites (default: false)
     """
     limit = request.args.get('limit', 1000, type=int)
     offset = request.args.get('offset', 0, type=int)
+    include_decayed = request.args.get('include_decayed', 'false').lower() == 'true'
     
     constellation = Constellation.query.filter_by(slug=slug).first()
     
     if not constellation:
         return jsonify({'error': 'Constellation not found'}), 404
     
-    satellites = Satellite.query.filter_by(
-        constellation_id=constellation.id
-    ).offset(offset).limit(limit).all()
+    query = Satellite.query.filter_by(constellation_id=constellation.id)
+    
+    if not include_decayed:
+        query = query.filter_by(is_active=True)
+    
+    satellites = query.offset(offset).limit(limit).all()
+    
+    # Get total count with filter applied
+    total_query = Satellite.query.filter_by(constellation_id=constellation.id)
+    if not include_decayed:
+        total_query = total_query.filter_by(is_active=True)
+    total_count = total_query.count()
     
     return jsonify({
         'constellation': constellation.name,
-        'total': constellation.satellite_count,
+        'total': total_count,
         'offset': offset,
         'limit': limit,
         'satellites': [sat.to_dict(include_tle=False) for sat in satellites]
@@ -149,15 +160,21 @@ def get_constellation_tle(slug):
     
     Query parameters:
     - auto_fetch: Enable/disable auto-fetch on missing data (default: true)
+    - include_decayed: If true, include decayed satellites (default: false)
     """
     if slug not in Config.CONSTELLATIONS:
         return jsonify({'error': f'Constellation "{slug}" not found'}), 404
     
     # Check if auto-fetch is enabled via query param
     auto_fetch = request.args.get('auto_fetch', 'true').lower() == 'true'
+    include_decayed = request.args.get('include_decayed', 'false').lower() == 'true'
     
     try:
-        tle_data = tle_service.get_constellation_tle(slug, auto_fetch=auto_fetch)
+        tle_data = tle_service.get_constellation_tle(
+            slug, 
+            auto_fetch=auto_fetch,
+            active_only=not include_decayed
+        )
         
         # Get constellation metadata
         config = Config.CONSTELLATIONS[slug]

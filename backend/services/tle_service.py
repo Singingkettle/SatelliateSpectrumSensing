@@ -66,7 +66,7 @@ class TLEService:
                 print(f"[TLEService] Rate limited for {key}: {remaining}s remaining", flush=True)
                 return False
             return True
-    
+            
     def _update_rate_limit(self, key: str):
         """Update the last fetch time for rate limiting."""
         with self._rate_limit_lock:
@@ -110,7 +110,7 @@ class TLEService:
         """
         if constellation_slug not in self.constellations:
             raise ValueError(f"Unknown constellation: {constellation_slug}")
-        
+
         # Check rate limit
         rate_key = f"gp:{constellation_slug}"
         if not self._check_rate_limit(rate_key, self.RATE_LIMIT_SECONDS):
@@ -124,18 +124,47 @@ class TLEService:
             print(f"[TLEService] No Space-Track query configured for {constellation_slug}", flush=True)
             return (0, 0)
         
+        # NOTE: Do NOT filter by DECAY_DATE here - we want ALL satellites (active + decayed)
+        # to match satellitemap.space counts. The frontend API filters by is_active for display.
+        # Space-Track GP class returns objects with valid TLEs (including recently decayed)
+        
         print(f"[TLEService] Updating TLE for {constellation_slug}...", flush=True)
+        print(f"[TLEService] Query config: {query}", flush=True)
         
         # Fetch GP data from Space-Track
+        gp_data = None
         try:
-            gp_data = spacetrack_service.get_gp_data(query, constellation_slug)
+            # Check if query contains multiple patterns (comma-separated)
+            if ',' in query and 'OBJECT_NAME' in query:
+                # Extract patterns and query them separately
+                patterns = self._extract_name_patterns(query)
+                if patterns:
+                    print(f"[TLEService] Using multi-pattern query: {patterns}", flush=True)
+                    gp_data = spacetrack_service.get_gp_by_multiple_patterns(patterns, constellation_slug)
+            
+            # If multi-pattern didn't work or wasn't applicable, try single pattern
+            if not gp_data and 'OBJECT_NAME~~' in query:
+                # Try simpler single pattern query
+                pattern = query.split('OBJECT_NAME~~')[1].split(',')[0].strip()
+                print(f"[TLEService] Using single pattern query: {pattern}", flush=True)
+                gp_data = spacetrack_service.get_gp_by_name_pattern(pattern, constellation_slug)
+            
+            # Fallback to original method
+            if not gp_data:
+                print(f"[TLEService] Using original query method", flush=True)
+                gp_data = spacetrack_service.get_gp_data(query, constellation_slug)
+                
         except Exception as e:
             print(f"[TLEService] Error fetching GP data: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return (0, 0)
         
         if not gp_data:
             print(f"[TLEService] No GP data returned for {constellation_slug}", flush=True)
             return (0, 0)
+        
+        print(f"[TLEService] Received {len(gp_data)} GP records", flush=True)
         
         # Update rate limit after successful fetch
         self._update_rate_limit(rate_key)
@@ -156,8 +185,30 @@ class TLEService:
         
         db.session.commit()
         
-        print(f"[TLEService] {constellation_slug}: {new_count} new, {updated_count} updated")
+        print(f"[TLEService] {constellation_slug}: {new_count} new, {updated_count} updated", flush=True)
         return (new_count, updated_count)
+    
+    def _extract_name_patterns(self, query: str) -> List[str]:
+        """
+        Extract name patterns from a query string.
+        
+        Args:
+            query: Query string like "OBJECT_NAME~~STARLINK,OBJECT_NAME~~FLOCK"
+        
+        Returns:
+            List of pattern strings like ["STARLINK", "FLOCK"]
+        """
+        patterns = []
+        parts = query.split(',')
+        
+        for part in parts:
+            part = part.strip()
+            if 'OBJECT_NAME~~' in part:
+                pattern = part.split('OBJECT_NAME~~')[1].strip()
+                if pattern:
+                    patterns.append(pattern)
+        
+        return patterns
 
     def _store_gp_data(self, gp_data: List[Dict], constellation: Constellation) -> Tuple[int, int]:
         """
@@ -187,6 +238,19 @@ class TLEService:
             mean_motion = float(record.get('MEAN_MOTION', 0))
             period_minutes = 1440.0 / mean_motion if mean_motion > 0 else None
             
+            # Determine if satellite is active (not decayed)
+            # GP class has DECAY_DATE field - if not null, satellite has decayed
+            decay_date_str = record.get('DECAY_DATE')
+            decay_date = None
+            is_active = True
+            
+            if decay_date_str:
+                try:
+                    decay_date = datetime.strptime(decay_date_str[:10], '%Y-%m-%d').date()
+                    is_active = False
+                except (ValueError, TypeError):
+                    pass
+            
             # Get existing satellite or create new
             satellite = Satellite.query.filter_by(norad_id=norad_id).first()
             
@@ -208,6 +272,8 @@ class TLEService:
                 satellite.mean_motion = mean_motion
                 satellite.tle_updated_at = datetime.utcnow()
                 satellite.constellation_id = constellation.id
+                satellite.is_active = is_active
+                satellite.decay_date = decay_date
                 
                 # Add to history if epoch changed
                 if old_epoch != epoch and record.get('TLE_LINE1') and record.get('TLE_LINE2'):
@@ -232,6 +298,8 @@ class TLEService:
                     semi_major_axis_km=float(record.get('SEMIMAJOR_AXIS', 0)),
                     mean_motion=mean_motion,
                     tle_updated_at=datetime.utcnow(),
+                    is_active=is_active,
+                    decay_date=decay_date,
                 )
                 db.session.add(satellite)
                 new_count += 1
@@ -288,7 +356,7 @@ class TLEService:
             remaining_hours = int((self.SATCAT_RATE_LIMIT_SECONDS - 
                 (time.time() - self._last_fetch_time.get(rate_key, 0))) / 3600)
             return {'error': f'SATCAT rate limited, try in {remaining_hours}h', 'rate_limited': True}
-        
+
         config = self.constellations[constellation_slug]
         query = config.get('spacetrack_query')
         
@@ -589,13 +657,15 @@ class TLEService:
     # ==================== Data Access ====================
 
     def get_constellation_tle(self, constellation_slug: str, 
-                              auto_fetch: bool = True) -> List[Dict]:
+                              auto_fetch: bool = True,
+                              active_only: bool = True) -> List[Dict]:
         """
         Get TLE data for a constellation.
         
         Args:
             constellation_slug: Constellation identifier
             auto_fetch: If True, fetch from Space-Track if data is missing
+            active_only: If True, return only active satellites
         
         Returns:
             List of satellite TLE dictionaries
@@ -603,9 +673,12 @@ class TLEService:
         constellation = Constellation.query.filter_by(slug=constellation_slug).first()
         
         if constellation:
-            satellites = Satellite.query.filter_by(
-                constellation_id=constellation.id
-            ).all()
+            query = Satellite.query.filter_by(constellation_id=constellation.id)
+            
+            if active_only:
+                query = query.filter_by(is_active=True)
+                
+            satellites = query.all()
             if satellites:
                 return [sat.to_tle_dict() for sat in satellites]
         
@@ -617,9 +690,10 @@ class TLEService:
                 
                 constellation = Constellation.query.filter_by(slug=constellation_slug).first()
                 if constellation:
-                    satellites = Satellite.query.filter_by(
-                        constellation_id=constellation.id
-                    ).all()
+                    query = Satellite.query.filter_by(constellation_id=constellation.id)
+                    if active_only:
+                        query = query.filter_by(is_active=True)
+                    satellites = query.all()
                     return [sat.to_tle_dict() for sat in satellites]
             except Exception as e:
                 print(f"[TLEService] Auto-fetch error: {e}")
@@ -650,7 +724,7 @@ class TLEService:
         """Parse epoch from Space-Track format."""
         if not epoch_str:
             return None
-        
+
         try:
             if '.' in epoch_str:
                 return datetime.strptime(epoch_str, '%Y-%m-%dT%H:%M:%S.%f')
@@ -665,7 +739,7 @@ class TLEService:
             epoch_str = line1[18:32].strip()
             year_2digit = int(epoch_str[:2])
             day_fraction = float(epoch_str[2:])
-            
+
             year = 2000 + year_2digit if year_2digit < 57 else 1900 + year_2digit
             
             return datetime(year, 1, 1) + timedelta(days=day_fraction - 1)
@@ -729,16 +803,16 @@ class TLEService:
             inclination = float(line2[8:16].strip())
             eccentricity = float("0." + line2[26:33].strip())
             mean_motion = float(line2[52:63].strip())
-            
+
             period_minutes = 1440.0 / mean_motion
             period_seconds = period_minutes * 60
             semi_major_axis = (
                 self.EARTH_MU * (period_seconds / (2 * math.pi)) ** 2
             ) ** (1 / 3)
-            
+
             apogee = semi_major_axis * (1 + eccentricity) - self.EARTH_RADIUS_KM
             perigee = semi_major_axis * (1 - eccentricity) - self.EARTH_RADIUS_KM
-            
+
             return {
                 "inclination": inclination,
                 "eccentricity": eccentricity,

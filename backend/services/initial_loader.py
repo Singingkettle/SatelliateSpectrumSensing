@@ -197,20 +197,31 @@ class InitialDataLoader:
                 
                 time.sleep(self.DELAY_AFTER_GP)
                 
-                # Stage 3: Historical TLE data (optional)
+                # Stage 3: Historical TLE data (optional, skip for large constellations)
+                # NOTE: GP_HISTORY should be downloaded once per satellite lifetime
+                # For large constellations (>500 satellites), skip history loading
+                # to avoid overwhelming Space-Track API
                 if include_history:
                     self._progress['current_stage'] = 'history'
-                    print(f"[InitialLoader] Stage 3: Loading history for {slug}...")
                     
                     try:
-                        # Only load history for constellations with data
                         constellation = Constellation.query.filter_by(slug=slug).first()
                         if constellation:
                             sat_count = Satellite.query.filter_by(
                                 constellation_id=constellation.id
                             ).count()
                             
-                            if sat_count > 0:
+                            # Skip history for large constellations to avoid API rate limits
+                            if sat_count > 500:
+                                print(f"[InitialLoader] Stage 3: Skipping history for {slug} ({sat_count} satellites - too large for API)")
+                                print(f"[InitialLoader] NOTE: For large constellations, download history from Space-Track cloud storage")
+                                self._progress['results'][slug]['stages']['history'] = {
+                                    'skipped': 'too_many_satellites',
+                                    'satellite_count': sat_count,
+                                    'message': 'Use Space-Track cloud storage for large constellation history'
+                                }
+                            elif sat_count > 0:
+                                print(f"[InitialLoader] Stage 3: Loading history for {slug}...")
                                 history_count = tle_service.sync_constellation_history(slug)
                                 self._progress['results'][slug]['stages']['history'] = {
                                     'records_added': history_count

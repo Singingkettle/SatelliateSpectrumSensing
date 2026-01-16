@@ -16,6 +16,7 @@ USAGE POLICY COMPLIANCE:
 
 import requests
 import time
+import urllib.parse
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from config import Config
@@ -145,7 +146,8 @@ class SpaceTrackService:
             Response data (JSON) or None on failure
         """
         timeout = timeout or self.QUERY_TIMEOUT
-        max_retries = min(3, len(Config.SPACETRACK_ACCOUNTS))
+        max_retries = min(5, len(Config.SPACETRACK_ACCOUNTS))
+        backoff_time = 2  # Initial backoff in seconds
         
         for attempt in range(max_retries):
             # Get available account
@@ -153,7 +155,7 @@ class SpaceTrackService:
             
             if not account:
                 # Wait for an account to become available
-                print(f"[SpaceTrack] No accounts available, waiting...")
+                print(f"[SpaceTrack] No accounts available, waiting...", flush=True)
                 account = self.account_pool.wait_for_available_account(
                     timeout=120, 
                     query_type=query_type, 
@@ -179,6 +181,14 @@ class SpaceTrackService:
                     # Record successful request
                     self.account_pool.record_request(username, query_type, constellation, True)
                     
+                    # Check for HTML response (indicates error page)
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'text/html' in content_type and response.text.startswith('<!DOCTYPE'):
+                        print(f"[SpaceTrack] Received HTML error page instead of data", flush=True)
+                        print(f"[SpaceTrack] Response preview: {response.text[:200]}", flush=True)
+                        # Might be a server error disguised as 200
+                        continue
+                    
                     try:
                         return response.json()
                     except ValueError:
@@ -187,33 +197,55 @@ class SpaceTrackService:
                 
                 elif response.status_code == 429:
                     # Rate limited
-                    print(f"[SpaceTrack] Rate limited (429) on {username[:10]}***")
+                    print(f"[SpaceTrack] Rate limited (429) on {username[:10]}***", flush=True)
                     self.account_pool.mark_rate_limited(username)
-                    time.sleep(2)
+                    time.sleep(backoff_time)
+                    backoff_time *= 2  # Exponential backoff
                     continue
                 
                 elif response.status_code in (401, 403):
                     # Auth issue
-                    print(f"[SpaceTrack] Auth error ({response.status_code}) on {username[:10]}***")
+                    print(f"[SpaceTrack] Auth error ({response.status_code}) on {username[:10]}***", flush=True)
                     self.account_pool.mark_auth_failed(username, f"HTTP {response.status_code}")
                     # Clear session to force re-auth
                     if username in self._session_auth_time:
                         del self._session_auth_time[username]
                     continue
                 
+                elif response.status_code == 500:
+                    # Server error - check if it's a rate limit message
+                    response_text = response.text.lower()
+                    if 'rate limit' in response_text or 'violated your query' in response_text:
+                        print(f"[SpaceTrack] Rate limit triggered (500) on {username[:10]}***", flush=True)
+                        self.account_pool.mark_rate_limited(username)
+                        # Wait longer for rate limit recovery
+                        wait_time = min(60, backoff_time * 4)
+                        print(f"[SpaceTrack] Waiting {wait_time}s before retry...", flush=True)
+                        time.sleep(wait_time)
+                        backoff_time *= 2
+                        continue
+                    else:
+                        # Other 500 error
+                        print(f"[SpaceTrack] Server error (500): {response.text[:300]}", flush=True)
+                        self.account_pool.mark_error(username, "Server error 500")
+                        # Try with different account after short wait
+                        time.sleep(2)
+                        continue
+                
                 else:
                     # Other error
-                    print(f"[SpaceTrack] Error {response.status_code}: {response.text[:200]}")
+                    print(f"[SpaceTrack] Error {response.status_code}: {response.text[:200]}", flush=True)
                     self.account_pool.mark_error(username, f"HTTP {response.status_code}")
                     
             except requests.Timeout:
-                print(f"[SpaceTrack] Timeout on {username[:10]}***")
+                print(f"[SpaceTrack] Timeout on {username[:10]}***", flush=True)
                 self.account_pool.mark_error(username, "Timeout")
                 
             except requests.RequestException as e:
-                print(f"[SpaceTrack] Request error: {e}")
+                print(f"[SpaceTrack] Request error: {e}", flush=True)
                 self.account_pool.mark_error(username, str(e))
         
+        print(f"[SpaceTrack] All retries exhausted for URL: {url[:100]}...", flush=True)
         return None
     
     # ==================== API Methods ====================
@@ -248,15 +280,139 @@ class SpaceTrackService:
         
         return status
     
+    def test_query_format(self, test_name: str = "STARLINK-1") -> Dict[str, Any]:
+        """
+        Test different query formats to diagnose API issues.
+        
+        This method tries multiple URL formats to find what works.
+        """
+        results = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'test_name': test_name,
+            'tests': []
+        }
+        
+        # Test 1: Simple query with exact name match
+        test1_url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"OBJECT_NAME/{test_name}/"
+            f"format/json/limit/1"
+        )
+        results['tests'].append({
+            'name': 'exact_match',
+            'url': test1_url,
+            'result': self._test_single_query(test1_url)
+        })
+        
+        # Test 2: Query with contains operator (~~)
+        test2_url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"OBJECT_NAME/~~STARLINK/"
+            f"format/json/limit/5"
+        )
+        results['tests'].append({
+            'name': 'contains_operator',
+            'url': test2_url,
+            'result': self._test_single_query(test2_url)
+        })
+        
+        # Test 3: Query with NORAD_CAT_ID (simpler)
+        test3_url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"NORAD_CAT_ID/44713/"
+            f"format/json"
+        )
+        results['tests'].append({
+            'name': 'norad_id',
+            'url': test3_url,
+            'result': self._test_single_query(test3_url)
+        })
+        
+        # Test 4: Query GP class without any filters (just limit)
+        test4_url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"format/json/limit/3"
+        )
+        results['tests'].append({
+            'name': 'no_filter',
+            'url': test4_url,
+            'result': self._test_single_query(test4_url)
+        })
+        
+        return results
+    
+    def _test_single_query(self, url: str) -> Dict[str, Any]:
+        """Execute a single test query and return detailed results."""
+        result = {
+            'success': False,
+            'status_code': None,
+            'content_type': None,
+            'response_preview': None,
+            'record_count': 0,
+            'error': None
+        }
+        
+        account = self.account_pool.get_available_account(QueryType.OTHER)
+        if not account:
+            result['error'] = 'No available account'
+            return result
+        
+        username = account['username']
+        password = account['password']
+        
+        try:
+            if not self._ensure_authenticated(username, password):
+                result['error'] = 'Authentication failed'
+                return result
+            
+            session = self._get_session(username)
+            response = session.get(url, timeout=30)
+            
+            result['status_code'] = response.status_code
+            result['content_type'] = response.headers.get('Content-Type', 'unknown')
+            
+            if response.status_code == 200:
+                if 'application/json' in result['content_type']:
+                    try:
+                        data = response.json()
+                        result['success'] = True
+                        result['record_count'] = len(data) if isinstance(data, list) else 1
+                        result['response_preview'] = str(data)[:200] if data else 'empty'
+                    except ValueError as e:
+                        result['error'] = f'JSON parse error: {e}'
+                        result['response_preview'] = response.text[:200]
+                else:
+                    result['response_preview'] = response.text[:200]
+                    result['error'] = f'Unexpected content type: {result["content_type"]}'
+            else:
+                result['response_preview'] = response.text[:300]
+                result['error'] = f'HTTP {response.status_code}'
+                
+        except Exception as e:
+            result['error'] = str(e)
+        
+        return result
+    
     def _format_query_filter(self, query_filter: str) -> str:
         """
         Convert query filter to proper Space-Track URL format.
         
-        Input: "OBJECT_NAME~~STARLINK" or "OBJECT_NAME~~STARLINK,OBJECT_NAME~~TEST"
-        Output: "OBJECT_NAME/~~STARLINK/" or multiple predicates joined
+        Space-Track API URL format: /class/{class}/predicate/value/predicate/value/.../format/{format}
         
-        Operators: ~~(contains), ^(starts), $(ends), <>(not equal), 
-                   <, >, <=, >=, --(range), null-val
+        Input: "OBJECT_NAME~~STARLINK" or "OBJECT_NAME~~STARLINK,NORAD_CAT_ID>40000"
+        Output: "OBJECT_NAME/~~STARLINK/" or "OBJECT_NAME/~~STARLINK/NORAD_CAT_ID/>40000/"
+        
+        Operators supported by Space-Track:
+        - ~~ : contains (case-insensitive)
+        - ^ : starts with
+        - $ : ends with
+        - <> : not equal
+        - < : less than
+        - > : greater than
+        - <= : less than or equal
+        - >= : greater than or equal
+        - -- : range (value1--value2)
+        - null-val : is null (no value needed)
         """
         if not query_filter:
             return ""
@@ -267,18 +423,43 @@ class SpaceTrackService:
         
         for condition in conditions:
             condition = condition.strip()
+            if not condition:
+                continue
             
-            # Parse operator and value
-            for op in ['~~', '^', '$', '<>', '<=', '>=', '<', '>', '--']:
+            # Check for null-val special case
+            if condition.endswith('/null-val'):
+                parts.append(f"{condition}/")
+                continue
+            
+            # Parse operator and value - check longer operators first
+            operators = ['~~', '<>', '<=', '>=', '^', '$', '<', '>', '--']
+            found_op = False
+            
+            for op in operators:
                 if op in condition:
-                    field, value = condition.split(op, 1)
-                    parts.append(f"{field.strip()}/{op}{value.strip()}/")
+                    idx = condition.index(op)
+                    field = condition[:idx].strip()
+                    value = condition[idx + len(op):].strip()
+                    # URL encode the value to handle special characters
+                    encoded_value = urllib.parse.quote(value, safe='')
+                    parts.append(f"{field}/{op}{encoded_value}/")
+                    found_op = True
                     break
-            else:
-                # No operator found, treat as field/value
-                if '/' not in condition:
-                    parts.append(f"{condition}/")
+            
+            if not found_op:
+                # No operator found, treat as field=value
+                if '=' in condition:
+                    field, value = condition.split('=', 1)
+                    encoded_value = urllib.parse.quote(value.strip(), safe='')
+                    parts.append(f"{field.strip()}/{encoded_value}/")
+                elif '/' in condition:
+                    # Already formatted
+                    if not condition.endswith('/'):
+                        parts.append(f"{condition}/")
+                    else:
+                        parts.append(condition)
                 else:
+                    # Just a field name (invalid, but handle gracefully)
                     parts.append(f"{condition}/")
         
         return ''.join(parts)
@@ -299,21 +480,24 @@ class SpaceTrackService:
         
         # Build URL for GP class (latest TLEs)
         # Add DECAY_DATE/null-val to get only active satellites
+        # Note: orderby value needs URL encoding for spaces
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/gp/"
             f"DECAY_DATE/null-val/"
             f"{formatted_filter}"
-            f"orderby/NORAD_CAT_ID asc/"
+            f"orderby/NORAD_CAT_ID%20asc/"
             f"format/json"
         )
         
-        print(f"[SpaceTrack] Querying GP data: {query_filter}")
-        print(f"[SpaceTrack] URL: {url}")
+        print(f"[SpaceTrack] Querying GP data: {query_filter}", flush=True)
+        print(f"[SpaceTrack] URL: {url}", flush=True)
         data = self._execute_query(url, QueryType.GP, constellation)
         
         if isinstance(data, list):
-            print(f"[SpaceTrack] GP query returned {len(data)} records")
+            print(f"[SpaceTrack] GP query returned {len(data)} records", flush=True)
             return data
+        elif data is not None:
+            print(f"[SpaceTrack] Unexpected response type: {type(data)}", flush=True)
         return []
     
     def get_gp_data_tle_format(self, query_filter: str, constellation: str = None) -> str:
@@ -329,7 +513,7 @@ class SpaceTrackService:
             f"{self.BASE_URL}/basicspacedata/query/class/gp/"
             f"DECAY_DATE/null-val/"
             f"{formatted_filter}"
-            f"orderby/NORAD_CAT_ID asc/"
+            f"orderby/NORAD_CAT_ID%20asc/"
             f"format/tle"
         )
         
@@ -354,18 +538,18 @@ class SpaceTrackService:
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/satcat/"
             f"{formatted_filter}"
-            f"orderby/LAUNCH desc/"
+            f"orderby/LAUNCH%20desc/"
             f"format/json"
         )
         
-        print(f"[SpaceTrack] Querying SATCAT: {query_filter}")
-        print(f"[SpaceTrack] URL: {url}")
-        print(f"[SpaceTrack] NOTE: SATCAT queries limited to 1/day per Space-Track policy")
+        print(f"[SpaceTrack] Querying SATCAT: {query_filter}", flush=True)
+        print(f"[SpaceTrack] URL: {url}", flush=True)
+        print(f"[SpaceTrack] NOTE: SATCAT queries limited to 1/day per Space-Track policy", flush=True)
         
         data = self._execute_query(url, QueryType.SATCAT, constellation)
         
         if isinstance(data, list):
-            print(f"[SpaceTrack] SATCAT query returned {len(data)} records")
+            print(f"[SpaceTrack] SATCAT query returned {len(data)} records", flush=True)
             return data
         return []
     
@@ -413,6 +597,9 @@ class SpaceTrackService:
         IMPORTANT: Per Space-Track documentation, GP_HISTORY should only be
         downloaded ONCE per satellite and stored locally. Do NOT re-download!
         
+        For large date ranges or many objects, Space-Track recommends downloading
+        year-bundled zip files from their cloud storage instead of using API.
+        
         Args:
             norad_ids: List of NORAD catalog IDs
             start_date: Start of history range
@@ -428,14 +615,28 @@ class SpaceTrackService:
         if not end_date:
             end_date = datetime.utcnow()
         
+        # Limit date range to avoid overwhelming the server
+        # Space-Track recommends downloading year-bundled files for large ranges
+        max_days = 365  # Limit to 1 year per query
+        date_span = (end_date - start_date).days
+        
+        if date_span > max_days:
+            print(f"[SpaceTrack] WARNING: Date range ({date_span} days) exceeds recommended limit ({max_days} days)", flush=True)
+            print(f"[SpaceTrack] Consider downloading year-bundled files for large ranges", flush=True)
+            # Split into yearly chunks
+            return self._get_gp_history_chunked_by_year(norad_ids, start_date, end_date, constellation)
+        
         results = []
-        CHUNK_SIZE = 100  # Balance between efficiency and URL length
+        CHUNK_SIZE = 20  # Smaller chunks for history queries
         
-        date_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
+        # Use CREATION_DATE instead of EPOCH for GP_HISTORY queries
+        # Format: CREATION_DATE/start--end/ or CREATION_DATE/>start/
+        start_str = start_date.strftime('%Y-%m-%d')
+        end_str = end_date.strftime('%Y-%m-%d')
         
-        print(f"[SpaceTrack] Fetching GP history for {len(norad_ids)} satellites")
-        print(f"[SpaceTrack] Date range: {date_range}")
-        print(f"[SpaceTrack] NOTE: GP_HISTORY should be downloaded once and stored locally")
+        print(f"[SpaceTrack] Fetching GP history for {len(norad_ids)} satellites", flush=True)
+        print(f"[SpaceTrack] Date range: {start_str} to {end_str} ({date_span} days)", flush=True)
+        print(f"[SpaceTrack] NOTE: GP_HISTORY should be downloaded once and stored locally", flush=True)
         
         total_chunks = (len(norad_ids) - 1) // CHUNK_SIZE + 1
         
@@ -444,32 +645,109 @@ class SpaceTrackService:
             chunk_num = i // CHUNK_SIZE + 1
             id_list = ",".join(map(str, chunk))
             
-            url = (
-                f"{self.BASE_URL}/basicspacedata/query/class/gp_history/"
-                f"NORAD_CAT_ID/{id_list}/"
-                f"EPOCH/{date_range}/"
-                f"orderby/EPOCH asc/"
-                f"format/json"
-            )
+            # Try different URL formats - Space-Track API can be finicky
+            # Valid Space-Track operators: > < -- ~~ ^ $ <> (NOT >= or <=)
+            urls_to_try = [
+                # Format 1: CREATION_DATE with range operator (recommended by Space-Track)
+                (
+                    f"{self.BASE_URL}/basicspacedata/query/class/gp_history/"
+                    f"NORAD_CAT_ID/{id_list}/"
+                    f"CREATION_DATE/{start_str}--{end_str}/"
+                    f"orderby/CREATION_DATE%20asc/"
+                    f"format/json"
+                ),
+                # Format 2: Use EPOCH instead of CREATION_DATE (alternative field)
+                (
+                    f"{self.BASE_URL}/basicspacedata/query/class/gp_history/"
+                    f"NORAD_CAT_ID/{id_list}/"
+                    f"EPOCH/{start_str}--{end_str}/"
+                    f"orderby/EPOCH%20asc/"
+                    f"format/json"
+                ),
+                # Format 3: Use > and < operators (NOT >= or <=, they're invalid)
+                (
+                    f"{self.BASE_URL}/basicspacedata/query/class/gp_history/"
+                    f"NORAD_CAT_ID/{id_list}/"
+                    f"CREATION_DATE/%3E{start_str}/"
+                    f"CREATION_DATE/%3C{end_str}/"
+                    f"orderby/CREATION_DATE%20asc/"
+                    f"format/json"
+                ),
+            ]
             
-            print(f"[SpaceTrack] Querying history chunk {chunk_num}/{total_chunks}...")
-            
-            data = self._execute_query(
-                url, 
-                QueryType.GP_HISTORY, 
-                constellation,
-                timeout=self.BULK_QUERY_TIMEOUT
-            )
+            data = None
+            for url_idx, url in enumerate(urls_to_try, 1):
+                print(f"[SpaceTrack] Querying history chunk {chunk_num}/{total_chunks} (format {url_idx}/{len(urls_to_try)})...", flush=True)
+                print(f"[SpaceTrack] URL: {url[:150]}...", flush=True)
+                
+                data = self._execute_query(
+                    url, 
+                    QueryType.GP_HISTORY, 
+                    constellation,
+                    timeout=self.BULK_QUERY_TIMEOUT
+                )
+                
+                if isinstance(data, list):
+                    if data:
+                        print(f"[SpaceTrack] Chunk {chunk_num}: {len(data)} records (format {url_idx} succeeded)", flush=True)
+                        break
+                    else:
+                        print(f"[SpaceTrack] Chunk {chunk_num}: Format {url_idx} returned empty list", flush=True)
+                elif data is None:
+                    print(f"[SpaceTrack] Chunk {chunk_num}: Format {url_idx} failed, trying next...", flush=True)
+                    if url_idx < len(urls_to_try):
+                        time.sleep(3)  # Wait before trying next format
+                    continue
             
             if isinstance(data, list):
                 results.extend(data)
-                print(f"[SpaceTrack] Chunk {chunk_num}: {len(data)} records")
+            elif data is None:
+                print(f"[SpaceTrack] Chunk {chunk_num}: All formats failed, skipping this chunk", flush=True)
             
-            # Throttle between chunks
+            # Throttle between chunks - GP_HISTORY has strict rate limits
             if i + CHUNK_SIZE < len(norad_ids):
-                time.sleep(3)
+                wait_time = 10  # Longer wait for history queries
+                print(f"[SpaceTrack] Waiting {wait_time}s before next chunk...", flush=True)
+                time.sleep(wait_time)
         
-        print(f"[SpaceTrack] GP history complete: {len(results)} total records")
+        print(f"[SpaceTrack] GP history complete: {len(results)} total records", flush=True)
+        return results
+    
+    def _get_gp_history_chunked_by_year(self, norad_ids: List[int], start_date: datetime,
+                                        end_date: datetime, constellation: str = None) -> List[Dict]:
+        """
+        Fetch GP history by splitting into yearly chunks.
+        
+        This is used when the date range exceeds recommended limits.
+        """
+        results = []
+        current_start = start_date
+        
+        while current_start < end_date:
+            # Calculate end of current year or end_date, whichever is earlier
+            current_end = min(
+                datetime(current_start.year + 1, 1, 1),
+                end_date
+            )
+            
+            print(f"[SpaceTrack] Fetching year {current_start.year}...", flush=True)
+            
+            year_results = self.get_gp_history(
+                norad_ids, 
+                current_start, 
+                current_end, 
+                constellation
+            )
+            
+            results.extend(year_results)
+            
+            # Move to next year
+            current_start = current_end
+            
+            # Wait between years
+            if current_start < end_date:
+                time.sleep(5)
+        
         return results
     
     def get_latest_tle_by_norad(self, norad_ids: List[int]) -> List[Dict]:
@@ -495,6 +773,82 @@ class SpaceTrackService:
         data = self._execute_query(url, QueryType.GP)
         return data if isinstance(data, list) else []
     
+    def get_gp_by_name_pattern(self, pattern: str, constellation: str = None, 
+                                limit: int = None) -> List[Dict]:
+        """
+        Get GP data by name pattern using the contains operator.
+        
+        This is a simpler version of get_gp_data that focuses on
+        a single name pattern without additional filters.
+        
+        Args:
+            pattern: Name pattern to search for (e.g., "STARLINK")
+            constellation: Constellation slug for rate limit tracking
+            limit: Maximum number of results (optional)
+        
+        Returns:
+            List of GP data dictionaries
+        """
+        # Build URL with the contains operator
+        # URL encode the pattern for safety
+        encoded_pattern = urllib.parse.quote(pattern, safe='')
+        
+        url_parts = [
+            f"{self.BASE_URL}/basicspacedata/query/class/gp",
+            f"OBJECT_NAME/~~{encoded_pattern}",
+            f"DECAY_DATE/null-val",  # Only active satellites
+            f"orderby/NORAD_CAT_ID%20asc",
+            "format/json"
+        ]
+        
+        if limit:
+            url_parts.append(f"limit/{limit}")
+        
+        url = "/".join(url_parts) + "/"
+        
+        print(f"[SpaceTrack] Querying GP by pattern: {pattern}", flush=True)
+        print(f"[SpaceTrack] URL: {url}", flush=True)
+        
+        data = self._execute_query(url, QueryType.GP, constellation)
+        
+        if isinstance(data, list):
+            print(f"[SpaceTrack] Pattern query returned {len(data)} records", flush=True)
+            return data
+        return []
+    
+    def get_gp_by_multiple_patterns(self, patterns: List[str], constellation: str = None) -> List[Dict]:
+        """
+        Get GP data matching any of multiple name patterns.
+        
+        Since Space-Track may not support OR queries well, this method
+        makes separate queries for each pattern and combines the results.
+        
+        Args:
+            patterns: List of name patterns to search for
+            constellation: Constellation slug for rate limit tracking
+        
+        Returns:
+            Combined list of GP data dictionaries (deduplicated by NORAD_CAT_ID)
+        """
+        all_results = {}
+        
+        for pattern in patterns:
+            print(f"[SpaceTrack] Querying pattern: {pattern}", flush=True)
+            data = self.get_gp_by_name_pattern(pattern, constellation, limit=2000)
+            
+            for record in data:
+                norad_id = record.get('NORAD_CAT_ID')
+                if norad_id and norad_id not in all_results:
+                    all_results[norad_id] = record
+            
+            # Throttle between pattern queries
+            if len(patterns) > 1:
+                time.sleep(2)
+        
+        result_list = list(all_results.values())
+        print(f"[SpaceTrack] Combined results: {len(result_list)} unique satellites", flush=True)
+        return result_list
+    
     def get_decay_data(self, days: int = 30) -> List[Dict]:
         """
         Get recent decay (re-entry) data.
@@ -508,7 +862,7 @@ class SpaceTrackService:
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/decay/"
             f"DECAY_EPOCH/>now-{days}/"
-            f"orderby/DECAY_EPOCH desc/"
+            f"orderby/DECAY_EPOCH%20desc/"
             f"format/json"
         )
         
@@ -560,7 +914,7 @@ class SpaceTrackService:
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/satcat/"
             f"LAUNCH/>={cutoff}/"
-            f"orderby/LAUNCH desc/"
+            f"orderby/LAUNCH%20desc/"
             f"format/json"
         )
         
