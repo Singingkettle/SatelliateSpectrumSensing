@@ -105,30 +105,63 @@ def sync_satcat_job():
 
 def backfill_history_job():
     """
-    Background job to backfill historical TLE data.
+    Background job to incrementally backfill historical TLE data.
     Runs daily at off-peak time (03:47 UTC).
     
-    Checks for gaps in history and fills them from Space-Track GP_HISTORY.
+    This job is designed to be run repeatedly until all history is complete:
+    - Downloads in small batches to respect API rate limits
+    - Already downloaded data is never re-downloaded
+    - Tracks progress and resumes from where it left off
+    
+    Target: 3 years of history for all constellations.
     """
     from services.tle_service import tle_service
     from app import app
     
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
-    print(f"\n--- [Scheduler] History Backfill Job at {timestamp} ---")
+    print(f"\n--- [Scheduler] Incremental History Backfill at {timestamp} ---")
+    
+    # Priority order for backfilling
+    priority_slugs = ['starlink', 'oneweb', 'gps', 'galileo', 'beidou', 
+                      'glonass', 'iridium', 'globalstar', 'stations']
     
     with app.app_context():
         try:
-            # Focus on main constellations
-            priority_slugs = ['starlink', 'oneweb', 'gps', 'stations']
-            
             for slug in priority_slugs:
-                if slug in tle_service.constellations:
-                    try:
-                        count = tle_service.sync_constellation_history(slug)
-                        if count > 0:
-                            print(f"  {slug}: {count} history records added")
-                    except Exception as e:
-                        print(f"  {slug}: history error - {e}")
+                if slug not in tle_service.constellations:
+                    continue
+                
+                try:
+                    # First check status without downloading
+                    status = tle_service.get_history_backfill_status(slug)
+                    
+                    if status.get('is_complete'):
+                        print(f"  {slug}: ✓ History complete ({status.get('total_satellites', 0)} sats)")
+                        continue
+                    
+                    progress = status.get('progress_percent', 0)
+                    remaining = status.get('satellites_remaining', 0) or (
+                        status.get('history_partial', 0) + status.get('history_none', 0)
+                    )
+                    
+                    print(f"  {slug}: {progress}% complete, {remaining} satellites need history")
+                    
+                    # Download some batches (limit to 3 batches per constellation per job run)
+                    # This prevents any single job from taking too long
+                    result = tle_service.sync_constellation_history(
+                        slug, 
+                        days=365 * 3,  # 3 years target
+                        max_batches=3  # Process 3 batches (150 satellites max)
+                    )
+                    
+                    records_added = result.get('records_added', 0)
+                    new_status = result.get('status', 'unknown')
+                    
+                    if records_added > 0:
+                        print(f"    → Added {records_added} records, status: {new_status}")
+                        
+                except Exception as e:
+                    print(f"  {slug}: history error - {e}")
             
             update_stats['last_history_backfill'] = timestamp
             

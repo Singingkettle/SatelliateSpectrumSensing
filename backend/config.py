@@ -82,12 +82,13 @@ class Config:
     )
 
     # History data settings
-    # NOTE: For large constellations (Starlink, OneWeb), keep this small to avoid
-    # overwhelming Space-Track API. Use 30 days for daily updates, longer ranges
-    # should be downloaded from Space-Track cloud storage (bundled zip files).
+    # The history backfill system is incremental and rate-limit compliant:
+    # - Downloads in small batches with delays between requests
+    # - Already downloaded data is never re-downloaded
+    # - Can handle large constellations over multiple scheduled runs
     HISTORY_DAYS_DEFAULT = int(
-        os.environ.get("HISTORY_DAYS_DEFAULT", 30)
-    )  # 30 days (small for API efficiency)
+        os.environ.get("HISTORY_DAYS_DEFAULT", 365 * 3)
+    )  # 3 years of history (downloaded incrementally)
     HISTORY_BATCH_SIZE = int(
         os.environ.get("HISTORY_BATCH_SIZE", 50)
     )  # Satellites per batch

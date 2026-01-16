@@ -491,72 +491,251 @@ class TLEService:
             return {'error': str(e)}
 
     # ==================== History Backfill ====================
+    
+    # Incremental backfill settings
+    HISTORY_CHUNK_DAYS = 30          # Download 30 days at a time
+    HISTORY_BATCH_SATELLITES = 50    # Process 50 satellites per batch
+    HISTORY_DELAY_BETWEEN_BATCHES = 60  # 1 minute between batches
+    HISTORY_DELAY_BETWEEN_CHUNKS = 120  # 2 minutes between time chunks
 
-    def sync_constellation_history(self, constellation_slug: str, days: int = None) -> int:
+    def sync_constellation_history(self, constellation_slug: str, days: int = None,
+                                   max_batches: int = None) -> Dict:
         """
-        Backfill historical TLE data for a constellation.
+        Incrementally backfill historical TLE data for a constellation.
+        
+        This method is designed to be called repeatedly until all history is downloaded:
+        1. Finds satellites that need history data
+        2. Downloads in small batches to respect API limits
+        3. Tracks progress so we can resume if interrupted
+        4. Already downloaded data is never re-downloaded
         
         Args:
             constellation_slug: Constellation identifier
-            days: Number of days of history (default: config value)
+            days: Number of days of history to target (default: 3 years)
+            max_batches: Maximum number of batches to process in this call (default: unlimited)
         
         Returns:
-            Number of new history records added
+            Dict with backfill status and statistics
         """
-        days = days or self.HISTORY_DAYS_DEFAULT
+        # Default to 3 years of history
+        days = days or (365 * 3)
         
-        # Check rate limit
-        rate_key = f"history:{constellation_slug}"
-        if not self._check_rate_limit(rate_key, self.HISTORY_RATE_LIMIT_SECONDS):
-            print(f"[TLEService] Skipping history backfill for {constellation_slug} due to rate limit")
-            return 0
-        
-        print(f"[TLEService] Backfilling history for {constellation_slug} ({days} days)...")
+        result = {
+            'constellation': constellation_slug,
+            'status': 'unknown',
+            'records_added': 0,
+            'satellites_processed': 0,
+            'satellites_remaining': 0,
+            'progress_percent': 0,
+            'message': ''
+        }
         
         constellation = Constellation.query.filter_by(slug=constellation_slug).first()
         if not constellation:
-            return 0
+            result['status'] = 'error'
+            result['message'] = 'Constellation not found'
+            return result
         
         # Get all satellites
         satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
         if not satellites:
-            return 0
+            result['status'] = 'error'
+            result['message'] = 'No satellites in constellation'
+            return result
         
-        # Find satellites needing history
+        total_satellites = len(satellites)
         target_start = datetime.utcnow() - timedelta(days=days)
-        satellites_to_fetch = []
+        
+        print(f"[TLEService] === History Backfill for {constellation_slug} ===", flush=True)
+        print(f"[TLEService] Total satellites: {total_satellites}", flush=True)
+        print(f"[TLEService] Target date range: {target_start.date()} to {datetime.utcnow().date()}", flush=True)
+        
+        # Find satellites needing history and determine their required date ranges
+        satellites_needing_history = []
         
         for sat in satellites:
-            oldest = TLEHistory.query.filter_by(satellite_id=sat.id)\
+            # Find the oldest TLE we have for this satellite
+            oldest_record = TLEHistory.query.filter_by(satellite_id=sat.id)\
                 .order_by(TLEHistory.epoch.asc()).first()
             
-            if not oldest or oldest.epoch > target_start + timedelta(days=7):
-                satellites_to_fetch.append(sat)
+            if oldest_record:
+                # We have some history - check if we need more
+                if oldest_record.epoch > target_start + timedelta(days=7):
+                    # Need to fill gap from target_start to oldest_record.epoch
+                    satellites_needing_history.append({
+                        'satellite': sat,
+                        'fetch_start': target_start,
+                        'fetch_end': oldest_record.epoch - timedelta(days=1),
+                        'has_some_history': True
+                    })
+            else:
+                # No history at all - need full range
+                satellites_needing_history.append({
+                    'satellite': sat,
+                    'fetch_start': target_start,
+                    'fetch_end': datetime.utcnow(),
+                    'has_some_history': False
+                })
         
-        if not satellites_to_fetch:
-            print(f"[TLEService] History up to date for {constellation_slug}")
-            return 0
+        satellites_complete = total_satellites - len(satellites_needing_history)
+        result['satellites_remaining'] = len(satellites_needing_history)
+        result['progress_percent'] = round(satellites_complete / total_satellites * 100, 1) if total_satellites > 0 else 100
         
-        print(f"[TLEService] Backfilling {len(satellites_to_fetch)} satellites...")
+        if not satellites_needing_history:
+            result['status'] = 'complete'
+            result['message'] = f'All {total_satellites} satellites have complete history'
+            print(f"[TLEService] History complete for all satellites!", flush=True)
+            return result
         
-        # Fetch history in batches
-        norad_ids = [s.norad_id for s in satellites_to_fetch]
-        history_data = spacetrack_service.get_gp_history(
-            norad_ids, 
-            start_date=target_start,
-            constellation=constellation_slug
-        )
+        print(f"[TLEService] Satellites needing history: {len(satellites_needing_history)}", flush=True)
+        print(f"[TLEService] Progress: {result['progress_percent']}%", flush=True)
         
-        if not history_data:
-            return 0
+        # Process in batches
+        batch_count = 0
+        total_records = 0
         
-        # Update rate limit
-        self._update_rate_limit(rate_key)
+        for i in range(0, len(satellites_needing_history), self.HISTORY_BATCH_SATELLITES):
+            if max_batches and batch_count >= max_batches:
+                result['status'] = 'partial'
+                result['message'] = f'Stopped after {max_batches} batches (rate limit protection)'
+                break
+            
+            batch = satellites_needing_history[i:i + self.HISTORY_BATCH_SATELLITES]
+            batch_num = i // self.HISTORY_BATCH_SATELLITES + 1
+            total_batches = (len(satellites_needing_history) - 1) // self.HISTORY_BATCH_SATELLITES + 1
+            
+            print(f"[TLEService] Processing batch {batch_num}/{total_batches}...", flush=True)
+            
+            # Group by similar date ranges for efficiency
+            norad_ids = [item['satellite'].norad_id for item in batch]
+            sats_in_batch = [item['satellite'] for item in batch]
+            
+            # Use the widest date range needed in this batch
+            batch_start = min(item['fetch_start'] for item in batch)
+            batch_end = max(item['fetch_end'] for item in batch)
+            
+            # Download history for this batch
+            records = self._fetch_history_incremental(
+                norad_ids, batch_start, batch_end, constellation_slug
+            )
+            
+            if records:
+                saved = self._save_history_data(records, sats_in_batch)
+                total_records += saved
+                print(f"[TLEService] Batch {batch_num}: saved {saved} records", flush=True)
+            
+            result['satellites_processed'] += len(batch)
+            batch_count += 1
+            
+            # Delay between batches to respect rate limits
+            if i + self.HISTORY_BATCH_SATELLITES < len(satellites_needing_history):
+                print(f"[TLEService] Waiting {self.HISTORY_DELAY_BETWEEN_BATCHES}s before next batch...", flush=True)
+                time.sleep(self.HISTORY_DELAY_BETWEEN_BATCHES)
         
-        # Save to database
-        count = self._save_history_data(history_data, satellites_to_fetch)
+        result['records_added'] = total_records
         
-        return count
+        if result['status'] != 'partial':
+            result['status'] = 'in_progress' if result['satellites_remaining'] > result['satellites_processed'] else 'complete'
+            result['message'] = f'Processed {result["satellites_processed"]} satellites, added {total_records} records'
+        
+        # Update remaining count
+        result['satellites_remaining'] = max(0, result['satellites_remaining'] - result['satellites_processed'])
+        result['progress_percent'] = round((total_satellites - result['satellites_remaining']) / total_satellites * 100, 1)
+        
+        print(f"[TLEService] Backfill result: {result['status']}", flush=True)
+        return result
+    
+    def _fetch_history_incremental(self, norad_ids: List[int], start_date: datetime,
+                                   end_date: datetime, constellation: str) -> List[Dict]:
+        """
+        Fetch history in time chunks to avoid overwhelming the API.
+        
+        Downloads history in HISTORY_CHUNK_DAYS increments.
+        """
+        all_records = []
+        current_start = start_date
+        
+        while current_start < end_date:
+            # Calculate chunk end (either HISTORY_CHUNK_DAYS from start or end_date)
+            chunk_end = min(current_start + timedelta(days=self.HISTORY_CHUNK_DAYS), end_date)
+            
+            print(f"[TLEService] Fetching chunk: {current_start.date()} to {chunk_end.date()}", flush=True)
+            
+            try:
+                records = spacetrack_service.get_gp_history(
+                    norad_ids,
+                    start_date=current_start,
+                    end_date=chunk_end,
+                    constellation=constellation
+                )
+                
+                if records:
+                    all_records.extend(records)
+                    print(f"[TLEService] Chunk returned {len(records)} records", flush=True)
+                    
+            except Exception as e:
+                print(f"[TLEService] Chunk fetch error: {e}", flush=True)
+            
+            # Move to next chunk
+            current_start = chunk_end
+            
+            # Delay between time chunks
+            if current_start < end_date:
+                time.sleep(self.HISTORY_DELAY_BETWEEN_CHUNKS)
+        
+        return all_records
+    
+    def get_history_backfill_status(self, constellation_slug: str, days: int = None) -> Dict:
+        """
+        Get the current status of history backfill for a constellation.
+        Does NOT trigger any downloads.
+        
+        Returns:
+            Dict with backfill progress information
+        """
+        days = days or (365 * 3)
+        
+        constellation = Constellation.query.filter_by(slug=constellation_slug).first()
+        if not constellation:
+            return {'error': 'Constellation not found'}
+        
+        satellites = Satellite.query.filter_by(constellation_id=constellation.id).all()
+        if not satellites:
+            return {'error': 'No satellites in constellation', 'total': 0}
+        
+        target_start = datetime.utcnow() - timedelta(days=days)
+        
+        complete = 0
+        partial = 0
+        none = 0
+        
+        for sat in satellites:
+            history_count = TLEHistory.query.filter_by(satellite_id=sat.id).count()
+            
+            if history_count == 0:
+                none += 1
+            else:
+                oldest = TLEHistory.query.filter_by(satellite_id=sat.id)\
+                    .order_by(TLEHistory.epoch.asc()).first()
+                
+                if oldest.epoch <= target_start + timedelta(days=7):
+                    complete += 1
+                else:
+                    partial += 1
+        
+        total = len(satellites)
+        
+        return {
+            'constellation': constellation_slug,
+            'total_satellites': total,
+            'history_complete': complete,
+            'history_partial': partial,
+            'history_none': none,
+            'progress_percent': round(complete / total * 100, 1) if total > 0 else 0,
+            'target_days': days,
+            'target_start_date': target_start.date().isoformat(),
+            'is_complete': complete == total
+        }
 
     def _save_history_data(self, history_data: List[Dict], 
                            satellites: List[Satellite]) -> int:
