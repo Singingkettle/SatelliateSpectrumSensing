@@ -27,8 +27,15 @@ class TLEHistory(db.Model):
     apogee_km = db.Column(db.Float)
     perigee_km = db.Column(db.Float)
     
+    # Additional orbital parameters for Altitude History charts
+    period_minutes = db.Column(db.Float)       # Orbital period in minutes
+    bstar = db.Column(db.Float)                # B* drag coefficient
+    mean_anomaly = db.Column(db.Float)         # Mean anomaly in degrees
+    raan = db.Column(db.Float)                 # Right ascension of ascending node
+    arg_of_perigee = db.Column(db.Float)       # Argument of perigee
+    
     # Metadata
-    source = db.Column(db.String(20), default='SpaceTrack')  # 'SpaceTrack', 'CelesTrak', 'API2'
+    source = db.Column(db.String(50), default='SpaceTrack')  # Data source identifier
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     def to_dict(self):
@@ -43,6 +50,12 @@ class TLEHistory(db.Model):
             'inclination': self.inclination,
             'apogee_km': self.apogee_km,
             'perigee_km': self.perigee_km,
+            'period_minutes': self.period_minutes,
+            'bstar': self.bstar,
+            'mean_anomaly': self.mean_anomaly,
+            'raan': self.raan,
+            'arg_of_perigee': self.arg_of_perigee,
+            'source': self.source,
             'recorded_at': self.recorded_at.isoformat() if self.recorded_at else None,
         }
     

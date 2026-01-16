@@ -1,8 +1,19 @@
 """
-Background scheduler service for periodic tasks.
-Handles automatic TLE updates similar to satellitemap.space
-Data source: space-track.org (via CelesTrak mirror) and supplemental sources
+Background Scheduler Service
+
+Handles periodic tasks for:
+- TLE data updates from Space-Track.org
+- SATCAT metadata synchronization
+- Historical data backfill
+- Data integrity checks
+
+IMPORTANT: Space-Track.org API Compliance
+- Do NOT schedule at :00 or :30 (peak times)
+- Schedule at :17 or :47 (off-peak times)
+- GP queries: 1 per hour per constellation
+- SATCAT queries: 1 per day after 1700 UTC
 """
+
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from config import Config
@@ -15,26 +26,31 @@ update_stats = {
     'last_update': None,
     'total_updates': 0,
     'failed_updates': 0,
+    'last_satcat_sync': None,
+    'last_history_backfill': None,
 }
 
 
-def update_all_tle_job():
+def update_gp_data_job():
     """
-    Background job to update TLE data for all constellations.
-    Runs every 4 hours to keep data fresh (similar to satellitemap.space).
+    Background job to update GP (TLE) data for all constellations.
+    Runs every 6 hours at off-peak times.
+    
+    Space-Track compliant: Uses account pool rotation and rate limiting.
     """
-    # Import here to avoid circular imports
     from services.tle_service import tle_service
     from app import app
     
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
-    print(f"--- [Scheduler] Starting TLE update at {timestamp} ---")
+    print(f"\n--- [Scheduler] GP Update Job at {timestamp} ---")
     
     with app.app_context():
         try:
             results = tle_service.update_all_constellations()
+            
             total_new = 0
             total_updated = 0
+            
             for slug, (new, updated) in results.items():
                 total_new += new
                 total_updated += updated
@@ -43,101 +59,164 @@ def update_all_tle_job():
             
             update_stats['last_update'] = timestamp
             update_stats['total_updates'] += 1
-            print(f"  Total: {total_new} new satellites, {total_updated} updated")
+            
+            print(f"  Total: {total_new} new, {total_updated} updated")
+            
         except Exception as e:
             update_stats['failed_updates'] += 1
-            print(f"[Scheduler] Error during TLE update: {e}")
+            print(f"[Scheduler] GP update error: {e}")
     
-    print("--- [Scheduler] TLE update complete ---")
+    print("--- [Scheduler] GP Update Job Complete ---\n")
 
 
-def update_priority_constellations_job():
+def sync_satcat_job():
     """
-    More frequent update for priority constellations (Starlink, ISS).
-    Runs every 2 hours at :42 (off-peak) to capture newly launched satellites.
+    Background job to sync SATCAT data for all constellations.
+    Runs daily at 17:27 UTC (after Space-Track's 1700 UTC update).
     
-    IMPORTANT: Uses CelesTrak instead of Space-Track to comply with API limits.
-    Space-Track should only be queried once per hour for the same data.
+    SATCAT provides launch dates, decay dates, and satellite metadata.
     """
     from services.tle_service import tle_service
     from app import app
     
-    priority_slugs = ['starlink', 'stations']  # Most frequently changing
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    print(f"\n--- [Scheduler] SATCAT Sync Job at {timestamp} ---")
+    
+    # Priority constellations for SATCAT sync
+    priority_slugs = ['starlink', 'oneweb', 'gps', 'iridium', 'globalstar']
     
     with app.app_context():
         try:
             for slug in priority_slugs:
-                try:
-                    # Force use of CelesTrak to avoid Space-Track rate limits
-                    # Space-Track is only used in the 6-hourly full update
-                    new, updated = tle_service.update_constellation_tle(slug, force_celestrak=True)
-                    if new > 0:
-                        print(f"[Scheduler] {slug}: {new} new satellites detected (via CelesTrak)")
-                except Exception as e:
-                    print(f"[Scheduler] Error updating {slug}: {e}")
+                if slug in Config.CONSTELLATIONS:
+                    try:
+                        result = tle_service.sync_catalog_from_spacetrack(slug)
+                        print(f"  {slug}: {result}")
+                    except Exception as e:
+                        print(f"  {slug}: error - {e}")
+            
+            update_stats['last_satcat_sync'] = timestamp
+            
         except Exception as e:
-            print(f"[Scheduler] Priority update error: {e}")
-
-
-def sync_external_satellites_job():
-    """
-    Sync satellite catalog from external sources to catch newly launched satellites.
-    Runs every 6 hours.
-    """
-    import requests
-    from models import db, Constellation, Satellite
-    from app import app
+            print(f"[Scheduler] SATCAT sync error: {e}")
     
-    external_constellations = ['starlink', 'oneweb']
-    
-    with app.app_context():
-        for slug in external_constellations:
-            try:
-                # Fetch from api2.satellitemap.space
-                url = f"https://api2.satellitemap.space/satellites?constellation={slug}&status=active"
-                response = requests.get(url, timeout=30)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('success') and data.get('data'):
-                        constellation = Constellation.query.filter_by(slug=slug).first()
-                        if constellation:
-                            new_count = 0
-                            for ext_sat in data['data']:
-                                norad_id = ext_sat.get('norad_id')
-                                if norad_id and not Satellite.query.filter_by(norad_id=norad_id).first():
-                                    new_sat = Satellite(
-                                        norad_id=norad_id,
-                                        name=ext_sat.get('sat_name', f'Unknown-{norad_id}'),
-                                        constellation_id=constellation.id,
-                                        is_active=ext_sat.get('status') == 'active',
-                                    )
-                                    db.session.add(new_sat)
-                                    new_count += 1
-                            if new_count > 0:
-                                db.session.commit()
-                                print(f"[Scheduler] External sync: {new_count} new {slug} satellites added")
-            except Exception as e:
-                print(f"[Scheduler] External sync error for {slug}: {e}")
+    print("--- [Scheduler] SATCAT Sync Job Complete ---\n")
 
 
 def backfill_history_job():
     """
-    Background job to backfill historical TLE data (last 1 year).
-    Runs once daily at off-peak time.
+    Background job to backfill historical TLE data.
+    Runs daily at off-peak time (03:47 UTC).
+    
+    Checks for gaps in history and fills them from Space-Track GP_HISTORY.
     """
     from services.tle_service import tle_service
     from app import app
     
-    print("--- [Scheduler] Starting History Backfill ---")
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    print(f"\n--- [Scheduler] History Backfill Job at {timestamp} ---")
+    
     with app.app_context():
         try:
-            # Iterate through all configured constellations
-            for slug in tle_service.constellations.keys():
-                tle_service.sync_constellation_history(slug, days=365)
+            # Focus on main constellations
+            priority_slugs = ['starlink', 'oneweb', 'gps', 'stations']
+            
+            for slug in priority_slugs:
+                if slug in tle_service.constellations:
+                    try:
+                        count = tle_service.sync_constellation_history(slug)
+                        if count > 0:
+                            print(f"  {slug}: {count} history records added")
+                    except Exception as e:
+                        print(f"  {slug}: history error - {e}")
+            
+            update_stats['last_history_backfill'] = timestamp
+            
         except Exception as e:
             print(f"[Scheduler] History backfill error: {e}")
-    print("--- [Scheduler] History Backfill Complete ---")
+    
+    print("--- [Scheduler] History Backfill Job Complete ---\n")
 
+
+def update_launch_data_job():
+    """
+    Background job to update and enrich launch data.
+    Uses Launch Library 2 API to add rocket type, mission details, etc.
+    """
+    from services.launch_service import launch_service
+    from models import Launch, Constellation
+    from app import app
+    
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    print(f"\n--- [Scheduler] Launch Data Update at {timestamp} ---")
+    
+    with app.app_context():
+        try:
+            # Find launches missing rocket type
+            launches = Launch.query.filter(
+                Launch.rocket_type.is_(None),
+                Launch.launch_date.isnot(None)
+            ).limit(10).all()
+            
+            for launch in launches:
+                try:
+                    result = launch_service.enrich_launch_from_ll2(launch.cospar_id)
+                    if result:
+                        print(f"  Enriched: {launch.cospar_id}")
+                except Exception as e:
+                    print(f"  {launch.cospar_id}: error - {e}")
+                
+        except Exception as e:
+            print(f"[Scheduler] Launch update error: {e}")
+    
+    print("--- [Scheduler] Launch Data Update Complete ---\n")
+
+
+def sync_ground_stations_job():
+    """
+    Background job to sync ground station data.
+    Uses community data sources since Space-Track doesn't provide this.
+    """
+    from services.ground_station_service import ground_station_service
+    from app import app
+    
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    print(f"\n--- [Scheduler] Ground Station Sync at {timestamp} ---")
+    
+    with app.app_context():
+        try:
+            for slug in ['starlink', 'oneweb']:
+                result = ground_station_service.sync_stations(slug)
+                print(f"  {slug}: {result}")
+                
+        except Exception as e:
+            print(f"[Scheduler] Ground station sync error: {e}")
+    
+    print("--- [Scheduler] Ground Station Sync Complete ---\n")
+
+
+def check_account_pool_health():
+    """
+    Background job to monitor Space-Track account pool health.
+    Logs warnings if accounts are suspended or rate limited.
+    """
+    from services.account_pool import get_account_pool
+    
+    try:
+        pool = get_account_pool()
+        status = pool.get_pool_status()
+        
+        active = status['active_accounts']
+        total = status['total_accounts']
+        
+        if active < total / 2:
+            print(f"[Scheduler] WARNING: Only {active}/{total} accounts available!")
+        
+        if status['suspended_accounts'] > 0:
+            print(f"[Scheduler] WARNING: {status['suspended_accounts']} accounts suspended!")
+            
+    except Exception as e:
+        print(f"[Scheduler] Account pool check error: {e}")
 
 
 def get_scheduler_status():
@@ -147,6 +226,8 @@ def get_scheduler_status():
         'last_update': update_stats['last_update'],
         'total_updates': update_stats['total_updates'],
         'failed_updates': update_stats['failed_updates'],
+        'last_satcat_sync': update_stats['last_satcat_sync'],
+        'last_history_backfill': update_stats['last_history_backfill'],
         'jobs': [
             {
                 'id': job.id,
@@ -162,74 +243,90 @@ def initialize_scheduler(app):
     """
     Initialize and start the background scheduler.
     
-    IMPORTANT: Space-Track.org API Usage Policy Compliance
-    - Do NOT schedule jobs at :00 or :30 (peak times)
-    - Schedule at :17 or :42 (off-peak times)
-    - Minimum 1 hour between same GP queries
-    - Use combined queries where possible
-    
-    Schedule:
-    - Every 6 hours at :17: Full update of all constellations (Space-Track compliant)
-    - Every 2 hours at :42: Priority update (Starlink only, uses CelesTrak to avoid Space-Track limits)
-    - Every 6 hours at :47: External satellite catalog sync (uses api2.satellitemap.space, not Space-Track)
-    
-    Args:
-        app: Flask application instance
+    Schedule (all times UTC, avoiding :00 and :30 peaks):
+    - GP Update: Every 6 hours at :17 (02:17, 08:17, 14:17, 20:17)
+    - SATCAT Sync: Daily at 17:27 (after Space-Track's 1700 update)
+    - History Backfill: Daily at 03:47
+    - Launch Data: Every 12 hours at :17
+    - Ground Stations: Weekly at Sunday 12:47
+    - Account Health: Every hour at :47
     """
-    # Full TLE update every 6 hours at :17 minutes (off-peak time)
-    # Space-Track compliant: avoids :00 and :30
+    
+    # GP data update - every 6 hours at :17
     scheduler.add_job(
-        update_all_tle_job,
+        update_gp_data_job,
         'cron',
-        hour='3,9,15,21',  # Every 6 hours
-        minute=17,         # Off-peak time (not :00 or :30)
+        hour='2,8,14,20',
+        minute=17,
         timezone='utc',
-        id='full_tle_update',
+        id='gp_update',
         replace_existing=True
     )
     
-    # Priority constellations update every 2 hours at :42 (off-peak)
-    # Uses CelesTrak instead of Space-Track to reduce API load
+    # SATCAT sync - daily at 17:27 UTC
     scheduler.add_job(
-        update_priority_constellations_job,
+        sync_satcat_job,
         'cron',
-        hour='1,3,5,7,9,11,13,15,17,19,21,23',  # Every 2 hours
-        minute=42,                              # Off-peak time
+        hour=17,
+        minute=27,
         timezone='utc',
-        id='priority_tle_update',
+        id='satcat_sync',
         replace_existing=True
     )
     
-    # External satellite sync every 6 hours at :47 (off-peak)
-    # Uses api2.satellitemap.space, not Space-Track
-    scheduler.add_job(
-        sync_external_satellites_job,
-        'cron',
-        hour='0,6,12,18',  # Every 6 hours
-        minute=47,         # Off-peak time
-        timezone='utc',
-        id='external_sync',
-        replace_existing=True
-    )
-    
-    # Daily history backfill at 02:27 UTC (off-peak)
-    # Checks for missing history and fills gaps from Space-Track
+    # History backfill - daily at 03:47 UTC
     scheduler.add_job(
         backfill_history_job,
         'cron',
-        hour=2,
-        minute=27,
+        hour=3,
+        minute=47,
         timezone='utc',
         id='history_backfill',
         replace_existing=True
     )
     
+    # Launch data enrichment - every 12 hours at :17
+    scheduler.add_job(
+        update_launch_data_job,
+        'cron',
+        hour='6,18',
+        minute=17,
+        timezone='utc',
+        id='launch_update',
+        replace_existing=True
+    )
+    
+    # Ground station sync - weekly on Sunday at 12:47
+    scheduler.add_job(
+        sync_ground_stations_job,
+        'cron',
+        day_of_week='sun',
+        hour=12,
+        minute=47,
+        timezone='utc',
+        id='ground_station_sync',
+        replace_existing=True
+    )
+    
+    # Account pool health check - every hour at :47
+    scheduler.add_job(
+        check_account_pool_health,
+        'cron',
+        minute=47,
+        timezone='utc',
+        id='account_health_check',
+        replace_existing=True
+    )
+    
     scheduler.start()
+    
     print(f"[Scheduler] Started with Space-Track compliant schedule:")
-    print(f"  - Full update: every 6h at :17 (03:17, 09:17, 15:17, 21:17 UTC)")
-    print(f"  - Priority update: every 2h at :42 (uses CelesTrak)")
-    print(f"  - External sync: every 6h at :47 (uses api2.satellitemap.space)")
-    print(f"  - History backfill: daily at 02:27 UTC (uses Space-Track bulk API)")
+    print(f"  - GP Update: every 6h at :17 UTC")
+    print(f"  - SATCAT Sync: daily at 17:27 UTC")
+    print(f"  - History Backfill: daily at 03:47 UTC")
+    print(f"  - Launch Enrichment: every 12h at :17 UTC")
+    print(f"  - Ground Stations: weekly Sunday 12:47 UTC")
+    print(f"  - Account Health: every hour at :47 UTC")
 
 
 def shutdown_scheduler():
@@ -240,10 +337,30 @@ def shutdown_scheduler():
 
 
 def trigger_manual_update():
-    """Trigger an immediate TLE update (useful for API endpoint)."""
+    """Trigger an immediate GP update (for API endpoint)."""
     scheduler.add_job(
-        update_all_tle_job,
+        update_gp_data_job,
         'date',
-        id='manual_update',
+        id='manual_gp_update',
+        replace_existing=True
+    )
+
+
+def trigger_satcat_sync():
+    """Trigger an immediate SATCAT sync."""
+    scheduler.add_job(
+        sync_satcat_job,
+        'date',
+        id='manual_satcat_sync',
+        replace_existing=True
+    )
+
+
+def trigger_history_backfill():
+    """Trigger an immediate history backfill."""
+    scheduler.add_job(
+        backfill_history_job,
+        'date',
+        id='manual_history_backfill',
         replace_existing=True
     )

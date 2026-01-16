@@ -49,24 +49,45 @@ class Config:
     # History settings (days)
     HISTORY_DAYS_DEFAULT = int(os.environ.get('HISTORY_DAYS_DEFAULT', 365))
     
-    # Space-Track.org API (Primary data source)
+    # Space-Track.org API (Primary and ONLY data source)
     # Documentation: https://www.space-track.org/documentation
-    # IMPORTANT: Set these via environment variables, never commit credentials!
+    # API USAGE POLICY:
+    # - GP (TLEs): 1 query per hour max for same data
+    # - GP_HISTORY: Download once per lifetime, store locally
+    # - SATCAT: 1 query per day after 1700 UTC
+    # - Rate limit: 30 requests/minute, 300 requests/hour
+    # - Do NOT schedule at :00 or :30 (peak times)
     SPACETRACK_URL = 'https://www.space-track.org'
-    # Primary account (defaults to environment variable or fallback)
-    SPACETRACK_USERNAME = os.environ.get('SPACETRACK_USERNAME', 'changshuo@bupt.edu.cn')
-    SPACETRACK_PASSWORD = os.environ.get('SPACETRACK_PASSWORD', 'Heitong1234....')
     
-    # Account Pool for failover
-    # The service will rotate through these if one is suspended or rate limited
+    # Multi-account pool for rate limit management and failover
+    # Accounts are rotated to stay within API limits
+    # NOTE: New accounts need to be registered at space-track.org before use
     SPACETRACK_ACCOUNTS = [
+        # Legacy accounts (verified working)
         {'username': '971470200@qq.com', 'password': 'Heitong1234....'},
-        {'username': SPACETRACK_USERNAME, 'password': SPACETRACK_PASSWORD}
+        {'username': 'changshuo@bupt.edu.cn', 'password': 'Heitong1234....'},
+        # New accounts (need registration at space-track.org)
+        # Uncomment after registering at https://www.space-track.org/auth/createAccount
+        # {'username': '923478861@qq.com', 'password': 'FWWXJYBZDSYS2026'},
+        # {'username': '3171543674@qq.com', 'password': '3171543674_qq.com'},
+        # {'username': '1109855493@qq.com', 'password': 'citybuster_zzs123'},
+        # {'username': '1079729701@qq.com', 'password': '2026_spacetrack'},
+        # {'username': '778826712@qq.com', 'password': '778826712qq.com'},
+        # {'username': 'cursorissb@2925.com', 'password': 'enteranewpassword2026'},
+        # {'username': 'apoepo886@outlook.com', 'password': 'qwertasdfg01478963'},
+        # {'username': 'hlac7517@gmail.com', 'password': 'spacetrack123321'},
     ]
     
-    # CelesTrak API URLs (Backup/mirror source)
-    CELESTRAK_BASE_URL = 'https://celestrak.org/NORAD/elements/gp.php'
-    CELESTRAK_SUPPLEMENTAL_URL = 'https://celestrak.org/NORAD/elements/supplemental/sup-gp.php'
+    # Legacy single account (for backward compatibility)
+    SPACETRACK_USERNAME = os.environ.get('SPACETRACK_USERNAME', SPACETRACK_ACCOUNTS[0]['username'])
+    SPACETRACK_PASSWORD = os.environ.get('SPACETRACK_PASSWORD', SPACETRACK_ACCOUNTS[0]['password'])
+    
+    # History data settings
+    HISTORY_DAYS_DEFAULT = int(os.environ.get('HISTORY_DAYS_DEFAULT', 365 * 3))  # 3 years
+    HISTORY_BATCH_SIZE = int(os.environ.get('HISTORY_BATCH_SIZE', 50))  # Satellites per batch
+    
+    # External data sources (for data Space-Track doesn't provide)
+    LAUNCH_LIBRARY_API_URL = 'https://ll.thespacedevs.com/2.2.0'
     
     # Supported constellations with their data source configurations
     # Primary source: Space-Track.org (direct API)

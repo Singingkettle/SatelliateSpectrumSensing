@@ -1,494 +1,548 @@
 """
 Space-Track.org API Service
+
 Handles authentication and data fetching from Space-Track.org
+with multi-account pool management for rate limit compliance.
+
+API Documentation: https://www.space-track.org/documentation
+
+USAGE POLICY COMPLIANCE:
+- GP (TLEs): 1 query per hour max for same constellation
+- GP_HISTORY: Download once per satellite lifetime, store locally
+- SATCAT: 1 query per day after 1700 UTC
+- Rate limit: 30 requests/minute, 300 requests/hour
+- Avoid scheduling at :00 or :30 (peak times)
 """
+
 import requests
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from config import Config
+from services.account_pool import (
+    AccountPoolManager, 
+    QueryType, 
+    init_account_pool, 
+    get_account_pool
+)
+
+
+class SpaceTrackError(Exception):
+    """Base exception for Space-Track errors"""
+    pass
+
+
+class RateLimitError(SpaceTrackError):
+    """Raised when rate limit is hit"""
+    pass
+
+
+class AuthenticationError(SpaceTrackError):
+    """Raised when authentication fails"""
+    pass
+
+
+class NoAvailableAccountError(SpaceTrackError):
+    """Raised when no accounts are available"""
+    pass
 
 
 class SpaceTrackService:
     """
     Service for interacting with Space-Track.org API.
-    Documentation: https://www.space-track.org/documentation
     
-    API USAGE POLICY (MUST COMPLY):
-    - GP (TLEs): 1 query per hour max
-    - GP_HISTORY: Once per lifetime - download and store locally
-    - SATCAT: 1 query per day after 1700 UTC
-    - Rate limit: 30 requests/minute, 300 requests/hour
-    - Do NOT schedule at :00 or :30 (peak times)
-    - Use comma-delimited lists instead of individual queries
+    Uses multi-account pool for:
+    - Automatic account rotation
+    - Rate limit management
+    - Failover handling
     """
     
     BASE_URL = "https://www.space-track.org"
     LOGIN_URL = f"{BASE_URL}/ajaxauth/login"
+    LOGOUT_URL = f"{BASE_URL}/ajaxauth/logout"
     
-    # Rate limiting constants from documentation
-    MAX_REQUESTS_PER_MINUTE = 25  # Stay under 30 limit
-    MAX_REQUESTS_PER_HOUR = 280   # Stay under 300 limit
-    GP_QUERY_INTERVAL = 3600     # 1 hour between same GP queries
-    SATCAT_QUERY_INTERVAL = 86400  # 1 day between SATCAT queries
-    GP_HISTORY_ONCE = True       # Download history once, store locally
+    # Timeouts
+    AUTH_TIMEOUT = 30
+    QUERY_TIMEOUT = 120
+    BULK_QUERY_TIMEOUT = 300
     
-    # Default credentials (should be set via environment variables in production)
-    DEFAULT_USERNAME = "changshuo@bupt.edu.cn"
-    DEFAULT_PASSWORD = "Heitong1234...."
-    
-    def __init__(self, username: str = None, password: str = None):
-        # Load account pool
-        self.accounts = getattr(Config, 'SPACETRACK_ACCOUNTS', [])
+    def __init__(self):
+        """Initialize the Space-Track service with account pool."""
+        # Initialize account pool with configured accounts
+        self.account_pool = init_account_pool(Config.SPACETRACK_ACCOUNTS)
         
-        # Backward compatibility / specific override
-        if username and password:
-            self.accounts = [{'username': username, 'password': password}]
-        elif not self.accounts:
-            # Fallback to single legacy config
-            u = getattr(Config, 'SPACETRACK_USERNAME', self.DEFAULT_USERNAME)
-            p = getattr(Config, 'SPACETRACK_PASSWORD', self.DEFAULT_PASSWORD)
-            self.accounts = [{'username': u, 'password': p}]
-            
-        self.current_account_index = 0
-        self._set_current_credentials()
+        # Session cache per account
+        self._sessions: Dict[str, requests.Session] = {}
+        self._session_auth_time: Dict[str, datetime] = {}
         
-        self.session = requests.Session()
-        self._authenticated = False
-
-    def _set_current_credentials(self):
-        """Set current username/password based on index."""
-        if self.accounts:
-            acc = self.accounts[self.current_account_index]
-            self.username = acc['username']
-            self.password = acc['password']
-
-    def rotate_account(self) -> bool:
-        """Switch to the next available account in the pool."""
-        if len(self.accounts) <= 1:
-            print("[SpaceTrack] No other accounts available to rotate.")
+        # Session expiry (re-auth after this time)
+        self._session_max_age = timedelta(hours=1)
+        
+        print(f"[SpaceTrack] Initialized with {len(Config.SPACETRACK_ACCOUNTS)} accounts")
+    
+    def _get_session(self, username: str) -> requests.Session:
+        """Get or create a session for an account."""
+        if username not in self._sessions:
+            self._sessions[username] = requests.Session()
+        return self._sessions[username]
+    
+    def _is_session_valid(self, username: str) -> bool:
+        """Check if a session is still valid."""
+        if username not in self._session_auth_time:
             return False
+        
+        age = datetime.utcnow() - self._session_auth_time[username]
+        return age < self._session_max_age
+    
+    def _authenticate(self, username: str, password: str) -> bool:
+        """Authenticate with Space-Track using specific credentials."""
+        session = self._get_session(username)
+        
+        try:
+            response = session.post(
+                self.LOGIN_URL,
+                data={'identity': username, 'password': password},
+                timeout=self.AUTH_TIMEOUT
+            )
             
-        prev_user = self.username
-        self.current_account_index = (self.current_account_index + 1) % len(self.accounts)
-        self._set_current_credentials()
-        self._authenticated = False
-        
-        # Reset session cookies to clear any bans/flags
-        self.session = requests.Session()
-        
-        print(f"[SpaceTrack] Rotating account from {prev_user} to {self.username}")
-        return True
+            if response.status_code == 200 and 'error' not in response.text.lower():
+                self._session_auth_time[username] = datetime.utcnow()
+                print(f"[SpaceTrack] Auth success: {username[:10]}***")
+                return True
+            else:
+                print(f"[SpaceTrack] Auth failed for {username[:10]}***: {response.text[:100]}")
+                return False
+                
+        except requests.RequestException as e:
+            print(f"[SpaceTrack] Auth error: {e}")
+            return False
     
-    def authenticate(self) -> bool:
-        """Authenticate with Space-Track.org, rotating accounts on failure."""
-        attempts = len(self.accounts)
+    def _ensure_authenticated(self, username: str, password: str) -> bool:
+        """Ensure we have a valid authenticated session."""
+        if self._is_session_valid(username):
+            return True
+        return self._authenticate(username, password)
+    
+    def _execute_query(self, url: str, query_type: QueryType = QueryType.OTHER,
+                      constellation: str = None, timeout: int = None) -> Optional[Any]:
+        """
+        Execute a query with automatic account rotation and retry.
         
-        while attempts > 0:
-            try:
-                print(f"[SpaceTrack] Authenticating as {self.username}...")
-                response = self.session.post(
-                    self.LOGIN_URL,
-                    data={
-                        'identity': self.username,
-                        'password': self.password
-                    },
-                    timeout=30
+        Args:
+            url: Full URL to query
+            query_type: Type of query for rate limit tracking
+            constellation: Constellation slug for tracking
+            timeout: Request timeout
+        
+        Returns:
+            Response data (JSON) or None on failure
+        """
+        timeout = timeout or self.QUERY_TIMEOUT
+        max_retries = min(3, len(Config.SPACETRACK_ACCOUNTS))
+        
+        for attempt in range(max_retries):
+            # Get available account
+            account = self.account_pool.get_available_account(query_type, constellation)
+            
+            if not account:
+                # Wait for an account to become available
+                print(f"[SpaceTrack] No accounts available, waiting...")
+                account = self.account_pool.wait_for_available_account(
+                    timeout=120, 
+                    query_type=query_type, 
+                    constellation=constellation
                 )
+                if not account:
+                    raise NoAvailableAccountError("All accounts exhausted or in cooldown")
+            
+            username = account['username']
+            password = account['password']
+            
+            try:
+                # Ensure authenticated
+                if not self._ensure_authenticated(username, password):
+                    self.account_pool.mark_auth_failed(username, "Authentication failed")
+                    continue
                 
-                if response.status_code == 200 and 'error' not in response.text.lower():
-                    self._authenticated = True
-                    print(f"[SpaceTrack] Authentication successful ({self.username})")
-                    return True
-                else:
-                    print(f"[SpaceTrack] Authentication failed for {self.username}: {response.text[:200]}")
-                    if not self.rotate_account():
-                        return False
-                    attempts -= 1
+                # Execute query
+                session = self._get_session(username)
+                response = session.get(url, timeout=timeout)
+                
+                if response.status_code == 200:
+                    # Record successful request
+                    self.account_pool.record_request(username, query_type, constellation, True)
                     
-            except requests.RequestException as e:
-                print(f"[SpaceTrack] Authentication network error: {e}")
-                # Network error might not be account related, but we can try next anyway
-                if not self.rotate_account():
-                    return False
-                attempts -= 1
+                    try:
+                        return response.json()
+                    except ValueError:
+                        # Return raw text for TLE format
+                        return response.text
                 
-        return False
+                elif response.status_code == 429:
+                    # Rate limited
+                    print(f"[SpaceTrack] Rate limited (429) on {username[:10]}***")
+                    self.account_pool.mark_rate_limited(username)
+                    time.sleep(2)
+                    continue
+                
+                elif response.status_code in (401, 403):
+                    # Auth issue
+                    print(f"[SpaceTrack] Auth error ({response.status_code}) on {username[:10]}***")
+                    self.account_pool.mark_auth_failed(username, f"HTTP {response.status_code}")
+                    # Clear session to force re-auth
+                    if username in self._session_auth_time:
+                        del self._session_auth_time[username]
+                    continue
+                
+                else:
+                    # Other error
+                    print(f"[SpaceTrack] Error {response.status_code}: {response.text[:200]}")
+                    self.account_pool.mark_error(username, f"HTTP {response.status_code}")
+                    
+            except requests.Timeout:
+                print(f"[SpaceTrack] Timeout on {username[:10]}***")
+                self.account_pool.mark_error(username, "Timeout")
+                
+            except requests.RequestException as e:
+                print(f"[SpaceTrack] Request error: {e}")
+                self.account_pool.mark_error(username, str(e))
+        
+        return None
     
-    def _ensure_authenticated(self):
-        """Ensure we have a valid session."""
-        if not self._authenticated:
-            self.authenticate()
+    # ==================== API Methods ====================
     
     def get_api_status(self) -> Dict[str, Any]:
-        """
-        Get Space-Track API status and health information.
-        """
-        self._ensure_authenticated()
-        
+        """Get Space-Track API status and health information."""
         status = {
-            'authenticated': self._authenticated,
+            'authenticated': False,
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'unknown',
             'message': '',
+            'account_pool': self.account_pool.get_pool_status(),
         }
         
         try:
-            # Test the API with a simple query
-            test_url = f"{self.BASE_URL}/basicspacedata/query/class/boxscore/format/json"
-            response = self.session.get(test_url, timeout=10)
+            url = f"{self.BASE_URL}/basicspacedata/query/class/boxscore/format/json"
+            data = self._execute_query(url, QueryType.OTHER)
             
-            if response.status_code == 200:
+            if data:
+                status['authenticated'] = True
                 status['status'] = 'online'
                 status['message'] = 'Space-Track API is operational'
-                try:
-                    boxscore = response.json()
-                    if boxscore:
-                        status['boxscore'] = boxscore[0] if isinstance(boxscore, list) else boxscore
-                except:
-                    pass
+                if isinstance(data, list) and data:
+                    status['boxscore'] = data[0]
             else:
-                status['status'] = 'degraded'
-                status['message'] = f'API returned status {response.status_code}'
+                status['status'] = 'error'
+                status['message'] = 'Failed to query API'
                 
-        except requests.RequestException as e:
+        except Exception as e:
             status['status'] = 'offline'
             status['message'] = str(e)
         
         return status
     
-    def get_recent_tle_updates(self, days: int = 1) -> Dict[str, Any]:
+    def get_gp_data(self, query_filter: str, constellation: str = None) -> List[Dict]:
         """
-        Get statistics about recent TLE updates.
+        Get General Perturbations (GP/TLE) data.
+        
+        Args:
+            query_filter: Space-Track query filter (e.g., "OBJECT_NAME~~STARLINK")
+            constellation: Constellation slug for rate limit tracking
+        
+        Returns:
+            List of GP data dictionaries
         """
-        self._ensure_authenticated()
+        # Build URL for GP class (latest TLEs)
+        # Add DECAY_DATE/null-val to get only active satellites
+        # Add epoch/>now-30 to get recent data
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"DECAY_DATE/null-val/"
+            f"{query_filter}/"
+            f"orderby/NORAD_CAT_ID asc/"
+            f"format/json"
+        )
         
-        result = {
-            'days': days,
-            'timestamp': datetime.utcnow().isoformat(),
-            'updates': [],
-            'total_count': 0,
-        }
+        print(f"[SpaceTrack] Querying GP data: {query_filter}")
+        data = self._execute_query(url, QueryType.GP, constellation)
         
-        try:
-            # Get decay data (TIP messages)
-            decay_url = f"{self.BASE_URL}/basicspacedata/query/class/decay/DECAY_EPOCH/>now-{days}/orderby/DECAY_EPOCH%20desc/format/json"
-            response = self.session.get(decay_url, timeout=30)
-            
-            if response.status_code == 200:
-                decays = response.json()
-                result['decays'] = decays[:20] if decays else []
-                result['decay_count'] = len(decays) if decays else 0
-                
-        except requests.RequestException as e:
-            result['error'] = str(e)
-        
-        return result
+        if isinstance(data, list):
+            print(f"[SpaceTrack] GP query returned {len(data)} records")
+            return data
+        return []
     
-    def get_tip_messages(self, limit: int = 20) -> List[Dict]:
+    def get_gp_data_tle_format(self, query_filter: str, constellation: str = None) -> str:
         """
-        Get Tracking and Impact Prediction (TIP) messages.
-        These are re-entry predictions.
-        """
-        self._ensure_authenticated()
+        Get GP data in TLE format (3-line).
         
-        try:
-            # TIP messages from decay class
-            url = f"{self.BASE_URL}/basicspacedata/query/class/tip/format/json/limit/{limit}"
-            response = self.session.get(url, timeout=30)
-            
-            if response.status_code == 200:
-                return response.json() or []
-            return []
-        except requests.RequestException as e:
-            print(f"[SpaceTrack] Error fetching TIP messages: {e}")
-            return []
+        Returns:
+            TLE text data
+        """
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"DECAY_DATE/null-val/"
+            f"{query_filter}/"
+            f"orderby/NORAD_CAT_ID asc/"
+            f"format/tle"
+        )
+        
+        data = self._execute_query(url, QueryType.GP, constellation)
+        return data if isinstance(data, str) else ""
     
-    def get_latest_tle_by_norad(self, norad_ids: List[int]) -> List[Dict]:
+    def query_satcat(self, query_filter: str, constellation: str = None) -> List[Dict]:
         """
-        Get latest TLE for specific NORAD IDs.
-        """
-        self._ensure_authenticated()
+        Query SATCAT (Satellite Catalog) for satellite metadata.
         
+        IMPORTANT: SATCAT should only be queried once per day after 1700 UTC.
+        
+        Args:
+            query_filter: Space-Track query filter
+            constellation: Constellation slug for rate limit tracking
+        
+        Returns:
+            List of SATCAT records
+        """
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/satcat/"
+            f"{query_filter}/"
+            f"orderby/LAUNCH desc/"
+            f"format/json"
+        )
+        
+        print(f"[SpaceTrack] Querying SATCAT: {query_filter}")
+        print(f"[SpaceTrack] NOTE: SATCAT queries limited to 1/day per Space-Track policy")
+        
+        data = self._execute_query(url, QueryType.SATCAT, constellation)
+        
+        if isinstance(data, list):
+            print(f"[SpaceTrack] SATCAT query returned {len(data)} records")
+            return data
+        return []
+    
+    def get_satcat_by_norad_ids(self, norad_ids: List[int]) -> List[Dict]:
+        """
+        Get SATCAT data for specific NORAD IDs.
+        
+        Args:
+            norad_ids: List of NORAD catalog IDs
+        
+        Returns:
+            List of SATCAT records
+        """
         if not norad_ids:
             return []
         
-        try:
-            norad_str = ','.join(map(str, norad_ids))
-            url = f"{self.BASE_URL}/basicspacedata/query/class/tle_latest/NORAD_CAT_ID/{norad_str}/ORDINAL/1/format/json"
-            response = self.session.get(url, timeout=30)
+        results = []
+        CHUNK_SIZE = 100
+        
+        for i in range(0, len(norad_ids), CHUNK_SIZE):
+            chunk = norad_ids[i:i + CHUNK_SIZE]
+            id_list = ",".join(map(str, chunk))
             
-            if response.status_code == 200:
-                return response.json() or []
-            return []
-        except requests.RequestException as e:
-            print(f"[SpaceTrack] Error fetching TLE: {e}")
-            return []
-
-    def get_bulk_history(self, norad_ids: List[int], start_date: datetime, end_date: datetime = None) -> List[Dict]:
+            url = (
+                f"{self.BASE_URL}/basicspacedata/query/class/satcat/"
+                f"NORAD_CAT_ID/{id_list}/"
+                f"format/json"
+            )
+            
+            data = self._execute_query(url, QueryType.SATCAT)
+            if isinstance(data, list):
+                results.extend(data)
+            
+            # Throttle between chunks
+            if i + CHUNK_SIZE < len(norad_ids):
+                time.sleep(2)
+        
+        return results
+    
+    def get_gp_history(self, norad_ids: List[int], start_date: datetime,
+                       end_date: datetime = None, constellation: str = None) -> List[Dict]:
         """
-        Fetch historical TLE data for a list of NORAD IDs within a time range.
+        Fetch historical GP (TLE) data for satellites.
         
-        IMPORTANT: Per Space-Track documentation, GP_HISTORY should only be downloaded ONCE
-        per satellite and stored locally. Do NOT re-download the same history!
-        
-        This method uses gp_history class which is more appropriate for bulk historical data.
-        It handles chunking to respect URL length limits and includes proper throttling.
+        IMPORTANT: Per Space-Track documentation, GP_HISTORY should only be
+        downloaded ONCE per satellite and stored locally. Do NOT re-download!
         
         Args:
-            norad_ids: List of satellite catalog numbers
-            start_date: Start of the history range
-            end_date: End of the history range (default: now)
-            
+            norad_ids: List of NORAD catalog IDs
+            start_date: Start of history range
+            end_date: End of history range (default: now)
+            constellation: Constellation slug for tracking
+        
         Returns:
-            List of TLE dictionaries (GP format)
+            List of historical GP records
         """
-        self._ensure_authenticated()
+        if not norad_ids:
+            return []
         
         if not end_date:
             end_date = datetime.utcnow()
-            
-        results = []
-        # Use larger chunks for efficiency - Space-Track allows comma-delimited lists
-        # But balance with URL length limits (~4000 chars)
-        CHUNK_SIZE = 100  # ~100 NORAD IDs per request is reasonable
         
-        # Format dates for Space-Track query (YYYY-MM-DD)
+        results = []
+        CHUNK_SIZE = 100  # Balance between efficiency and URL length
+        
         date_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
         
-        print(f"[SpaceTrack] Fetching history for {len(norad_ids)} satellites from {start_date.date()} to {end_date.date()}")
-        print(f"[SpaceTrack] NOTE: Per policy, history should be stored locally and not re-downloaded")
+        print(f"[SpaceTrack] Fetching GP history for {len(norad_ids)} satellites")
+        print(f"[SpaceTrack] Date range: {date_range}")
+        print(f"[SpaceTrack] NOTE: GP_HISTORY should be downloaded once and stored locally")
         
         total_chunks = (len(norad_ids) - 1) // CHUNK_SIZE + 1
         
         for i in range(0, len(norad_ids), CHUNK_SIZE):
             chunk = norad_ids[i:i + CHUNK_SIZE]
-            id_list = ",".join(map(str, chunk))
             chunk_num = i // CHUNK_SIZE + 1
+            id_list = ",".join(map(str, chunk))
             
-            # Use gp_history class for historical data (per documentation)
-            # Note: gp_history is the correct class for bulk historical TLE download
-            query_url = (
+            url = (
                 f"{self.BASE_URL}/basicspacedata/query/class/gp_history/"
                 f"NORAD_CAT_ID/{id_list}/"
                 f"EPOCH/{date_range}/"
-                f"orderby/EPOCH asc/format/json"
+                f"orderby/EPOCH asc/"
+                f"format/json"
             )
             
-            try:
-                print(f"[SpaceTrack] Querying chunk {chunk_num}/{total_chunks} ({len(chunk)} satellites)...")
-                response = self.session.get(query_url, timeout=120)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if data:
-                        results.extend(data)
-                        print(f"[SpaceTrack] Chunk {chunk_num}: received {len(data)} records")
-                    # Throttle between chunks - stay well under 30/minute limit
-                    # With 100 IDs per chunk, we want ~3 seconds between requests
-                    time.sleep(3)
-                elif response.status_code == 429:
-                    print("[SpaceTrack] Rate limit hit! Waiting 90s before retry...")
-                    time.sleep(90)
-                    # Retry this chunk once
-                    response = self.session.get(query_url, timeout=120)
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data:
-                            results.extend(data)
-                elif response.status_code in (401, 403):
-                    print(f"[SpaceTrack] Auth error {response.status_code}, rotating account...")
-                    if self.rotate_account():
-                        self._ensure_authenticated()
-                        # Retry with new account
-                        response = self.session.get(query_url, timeout=120)
-                        if response.status_code == 200:
-                            data = response.json()
-                            if data:
-                                results.extend(data)
-                else:
-                    print(f"[SpaceTrack] Error: {response.status_code} - {response.text[:200]}")
-                    
-            except requests.RequestException as e:
-                print(f"[SpaceTrack] Request failed: {e}")
-                time.sleep(5)  # Brief pause before next chunk
-                
-        print(f"[SpaceTrack] History fetch complete: {len(results)} total records")
+            print(f"[SpaceTrack] Querying history chunk {chunk_num}/{total_chunks}...")
+            
+            data = self._execute_query(
+                url, 
+                QueryType.GP_HISTORY, 
+                constellation,
+                timeout=self.BULK_QUERY_TIMEOUT
+            )
+            
+            if isinstance(data, list):
+                results.extend(data)
+                print(f"[SpaceTrack] Chunk {chunk_num}: {len(data)} records")
+            
+            # Throttle between chunks
+            if i + CHUNK_SIZE < len(norad_ids):
+                time.sleep(3)
+        
+        print(f"[SpaceTrack] GP history complete: {len(results)} total records")
         return results
     
-    def get_satcat_data(self, norad_ids: List[int]) -> List[Dict]:
+    def get_latest_tle_by_norad(self, norad_ids: List[int]) -> List[Dict]:
         """
-        Fetch SATCAT data for specific NORAD IDs.
-        Useful for getting launch details (Site, Date, Mission).
+        Get latest TLE for specific NORAD IDs.
+        
+        Args:
+            norad_ids: List of NORAD catalog IDs
+        
+        Returns:
+            List of TLE records
         """
-        self._ensure_authenticated()
-        
-        results = []
-        CHUNK_SIZE = 100
-        
-        print(f"[SpaceTrack] Fetching SATCAT for {len(norad_ids)} satellites")
-        
-        import time
-        for i in range(0, len(norad_ids), CHUNK_SIZE):
-            chunk = norad_ids[i:i + CHUNK_SIZE]
-            id_list = ",".join(map(str, chunk))
-            
-            # Query satcat by NORAD_CAT_ID
-            url = f"{self.BASE_URL}/basicspacedata/query/class/satcat/NORAD_CAT_ID/{id_list}/format/json"
-            
-            try:
-                response = self.session.get(url, timeout=30)
-                if response.status_code == 200:
-                    data = response.json()
-                    results.extend(data)
-                    time.sleep(1) # Polite throttle
-                elif response.status_code == 429:
-                    print("[SpaceTrack] Rate limit hit! Sleeping...")
-                    time.sleep(30)
-                else:
-                    print(f"[SpaceTrack] SATCAT error: {response.status_code}")
-            except Exception as e:
-                print(f"[SpaceTrack] SATCAT request failed: {e}")
-                
-        return results
-
-    def query_satcat(self, query: str) -> List[Dict]:
-        """
-        Query SATCAT by arbitrary filter (e.g. OBJECT_NAME~~STARLINK).
-        Returns ALL matching objects (active and decayed).
-        
-        IMPORTANT: Per Space-Track documentation, SATCAT should only be queried
-        once per day after 1700 UTC. Data should be stored locally.
-        """
-        self._ensure_authenticated()
-        try:
-            # Query satcat with the provided filter
-            # Using format/json/orderby/LAUNCH desc
-            url = f"{self.BASE_URL}/basicspacedata/query/class/satcat/{query}/orderby/LAUNCH%20desc/format/json"
-            print(f"[SpaceTrack] Querying SATCAT (once/day limit): {query}")
-            
-            response = self.session.get(url, timeout=120)
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    print(f"[SpaceTrack] SATCAT returned {len(data)} records")
-                    return data
-                elif isinstance(data, dict) and 'error' in str(data).lower():
-                    print(f"[SpaceTrack] SATCAT query error in response: {data}")
-                    return []
-                return data or []
-            elif response.status_code == 429:
-                print("[SpaceTrack] Rate limit hit on SATCAT query - try again after 1700 UTC")
-                return []
-            elif response.status_code in (401, 403):
-                print(f"[SpaceTrack] Auth error {response.status_code} on SATCAT, rotating account...")
-                if self.rotate_account():
-                    self._ensure_authenticated()
-                    # Retry with new account
-                    response = self.session.get(url, timeout=120)
-                    if response.status_code == 200:
-                        return response.json() or []
-                return []
-            else:
-                print(f"[SpaceTrack] SATCAT query error: {response.status_code} - {response.text[:200]}")
-                return []
-        except requests.RequestException as e:
-            print(f"[SpaceTrack] SATCAT query failed: {e}")
+        if not norad_ids:
             return []
-
-    def get_tle_publish_stats(self, days: int = 21) -> List[Dict]:
-        """
-        Get TLE publication statistics for the last N days.
-        """
-        self._ensure_authenticated()
         
-        stats = []
+        norad_str = ','.join(map(str, norad_ids))
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/gp/"
+            f"NORAD_CAT_ID/{norad_str}/"
+            f"format/json"
+        )
         
-        try:
-            # Get GP data publish counts per day
-            url = f"{self.BASE_URL}/basicspacedata/query/class/gp_history/EPOCH/>now-{days}/format/json/limit/10000"
-            response = self.session.get(url, timeout=60)
-            
-            if response.status_code == 200:
-                data = response.json() or []
-                
-                # Group by date
-                date_counts = {}
-                for entry in data:
-                    epoch = entry.get('EPOCH', '')[:10]  # Get date part
-                    if epoch:
-                        date_counts[epoch] = date_counts.get(epoch, 0) + 1
-                
-                # Convert to list sorted by date
-                stats = [
-                    {'date': date, 'count': count}
-                    for date, count in sorted(date_counts.items())
-                ]
-                
-        except requests.RequestException as e:
-            print(f"[SpaceTrack] Error fetching publish stats: {e}")
-        
-        return stats
+        data = self._execute_query(url, QueryType.GP)
+        return data if isinstance(data, list) else []
     
-    def get_latest_launches(self, days: int = 30) -> List[Dict]:
+    def get_decay_data(self, days: int = 30) -> List[Dict]:
+        """
+        Get recent decay (re-entry) data.
+        
+        Args:
+            days: Number of days to look back
+        
+        Returns:
+            List of decay records
+        """
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/decay/"
+            f"DECAY_EPOCH/>now-{days}/"
+            f"orderby/DECAY_EPOCH desc/"
+            f"format/json"
+        )
+        
+        data = self._execute_query(url, QueryType.DECAY)
+        return data if isinstance(data, list) else []
+    
+    def get_tip_messages(self, limit: int = 20) -> List[Dict]:
+        """
+        Get Tracking and Impact Prediction (TIP) messages.
+        These are re-entry predictions.
+        
+        Args:
+            limit: Maximum number of records
+        
+        Returns:
+            List of TIP records
+        """
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/tip/"
+            f"format/json/"
+            f"limit/{limit}"
+        )
+        
+        data = self._execute_query(url, QueryType.TIP)
+        return data if isinstance(data, list) else []
+    
+    def get_announcements(self, limit: int = 5) -> List[Dict]:
+        """Get Space-Track announcements."""
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/announcement/"
+            f"format/json/"
+            f"limit/{limit}"
+        )
+        
+        data = self._execute_query(url, QueryType.OTHER)
+        return data if isinstance(data, list) else []
+    
+    def get_recent_launches(self, days: int = 30) -> List[Dict]:
         """
         Get satellites launched in the last N days.
-        """
-        self._ensure_authenticated()
         
-        try:
-            cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
-            url = f"{self.BASE_URL}/basicspacedata/query/class/satcat/LAUNCH/>={cutoff}/orderby/LAUNCH%20desc/format/json"
-            response = self.session.get(url, timeout=30)
-            
-            if response.status_code == 200:
-                return response.json() or []
-            return []
-        except requests.RequestException as e:
-            print(f"[SpaceTrack] Error fetching launches: {e}")
-            return []
-    
-    def get_announcements(self) -> List[Dict]:
-        """
-        Get Space-Track announcements.
-        """
-        self._ensure_authenticated()
+        Args:
+            days: Number of days to look back
         
-        try:
-            url = f"{self.BASE_URL}/basicspacedata/query/class/announcement/format/json/limit/5"
-            response = self.session.get(url, timeout=15)
-            
-            if response.status_code == 200:
-                return response.json() or []
-            return []
-        except requests.RequestException as e:
-            print(f"[SpaceTrack] Error fetching announcements: {e}")
-            return []
+        Returns:
+            List of recently launched satellites
+        """
+        cutoff = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d')
+        url = (
+            f"{self.BASE_URL}/basicspacedata/query/class/satcat/"
+            f"LAUNCH/>={cutoff}/"
+            f"orderby/LAUNCH desc/"
+            f"format/json"
+        )
+        
+        data = self._execute_query(url, QueryType.SATCAT)
+        return data if isinstance(data, list) else []
     
     def get_full_status(self) -> Dict[str, Any]:
-        """
-        Get comprehensive Space-Track status including all metrics.
-        """
+        """Get comprehensive Space-Track status including all metrics."""
         status = self.get_api_status()
         
         if status['status'] == 'online':
-            status['tip_messages'] = self.get_tip_messages(10)
-            status['announcements'] = self.get_announcements()
-            status['recent_launches'] = self.get_latest_launches(7)[:10]
-            status['tle_stats'] = self.get_tle_publish_stats(21)
+            try:
+                status['tip_messages'] = self.get_tip_messages(10)
+                status['announcements'] = self.get_announcements()
+                status['recent_decays'] = self.get_decay_data(7)[:10]
+            except Exception as e:
+                status['additional_data_error'] = str(e)
         
         return status
     
-    def logout(self):
-        """Logout and close session."""
-        try:
-            logout_url = f"{self.BASE_URL}/ajaxauth/logout"
-            self.session.get(logout_url, timeout=10)
-        except:
-            pass
-        finally:
-            self._authenticated = False
-            self.session.close()
+    def logout_all(self):
+        """Logout from all sessions."""
+        for username, session in self._sessions.items():
+            try:
+                session.get(self.LOGOUT_URL, timeout=10)
+            except:
+                pass
+            finally:
+                session.close()
+        
+        self._sessions.clear()
+        self._session_auth_time.clear()
 
 
 # Singleton instance

@@ -10,5 +10,15 @@ from .launch import Launch
 from .satellite import Satellite
 from .ground_station import GroundStation
 from .tle_history import TLEHistory
+from .account import SpaceTrackAccount, DataSyncLog
 
-__all__ = ['db', 'Constellation', 'Launch', 'Satellite', 'GroundStation', 'TLEHistory']
+__all__ = [
+    'db', 
+    'Constellation', 
+    'Launch', 
+    'Satellite', 
+    'GroundStation', 
+    'TLEHistory',
+    'SpaceTrackAccount',
+    'DataSyncLog',
+]

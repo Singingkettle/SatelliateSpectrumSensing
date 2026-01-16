@@ -74,11 +74,20 @@ def create_app(config_name=None):
     @app.route('/api/health', methods=['GET'])
     def health_check():
         """Health check endpoint for monitoring."""
+        from services.account_pool import get_account_pool
+        
+        try:
+            pool_status = get_account_pool().get_pool_status()
+            accounts_available = pool_status['active_accounts']
+        except:
+            accounts_available = 'unknown'
+        
         return jsonify({
             'status': 'ok',
             'message': 'Satellite Tracker API is running',
-            'version': '2.0.0',
-            'data_source': 'space-track.org via CelesTrak'
+            'version': '3.0.0',
+            'data_source': 'space-track.org (exclusive)',
+            'accounts_available': accounts_available,
         })
     
     # API info endpoint
@@ -87,14 +96,15 @@ def create_app(config_name=None):
         """API information and available endpoints."""
         return jsonify({
             'name': 'ChangShuoSpace API',
-            'version': '2.0.0',
-            'data_source': 'space-track.org (via CelesTrak mirror)',
+            'version': '3.0.0',
+            'data_source': 'space-track.org (exclusive)',
             'endpoints': {
                 'constellations': '/api/constellations',
                 'satellites': '/api/satellites',
                 'ground_stations': '/api/ground-stations',
                 'statistics': '/api/statistics',
                 'scheduler': '/api/scheduler/status',
+                'admin': '/api/admin/*',
                 'health': '/api/health',
             }
         })
@@ -116,6 +126,75 @@ def create_app(config_name=None):
             'status': 'success',
             'message': 'TLE update triggered'
         })
+    
+    # ==================== Admin Endpoints ====================
+    
+    @app.route('/api/admin/account-pool/status', methods=['GET'])
+    def account_pool_status():
+        """Get Space-Track account pool status."""
+        from services.account_pool import get_account_pool
+        try:
+            pool = get_account_pool()
+            return jsonify(pool.get_pool_status())
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/api/admin/data/status', methods=['GET'])
+    def data_loading_status():
+        """Get data loading status."""
+        from services.initial_loader import initial_loader
+        return jsonify(initial_loader.get_loading_status())
+    
+    @app.route('/api/admin/data/initial-load', methods=['POST'])
+    def trigger_initial_load():
+        """Trigger initial data loading."""
+        from flask import request
+        from services.initial_loader import initial_loader
+        
+        if initial_loader.is_loading:
+            return jsonify({
+                'status': 'already_running',
+                'progress': initial_loader.progress
+            }), 400
+        
+        data = request.get_json() or {}
+        constellations = data.get('constellations')
+        background = data.get('background', True)
+        include_history = data.get('include_history', False)
+        
+        result = initial_loader.run_initial_load(
+            constellation_slugs=constellations,
+            background=background,
+            include_history=include_history
+        )
+        
+        return jsonify(result)
+    
+    @app.route('/api/admin/data/sync-constellation/<slug>', methods=['POST'])
+    def sync_constellation(slug):
+        """Sync data for a specific constellation."""
+        from flask import request
+        from services.initial_loader import initial_loader
+        
+        data = request.get_json() or {}
+        include_history = data.get('include_history', False)
+        
+        result = initial_loader.load_single_constellation(slug, include_history)
+        return jsonify(result)
+    
+    @app.route('/api/admin/scheduler/trigger-satcat', methods=['POST'])
+    def trigger_satcat():
+        """Manually trigger SATCAT sync."""
+        from services.scheduler_service import trigger_satcat_sync
+        trigger_satcat_sync()
+        return jsonify({'status': 'success', 'message': 'SATCAT sync triggered'})
+    
+    @app.route('/api/admin/scheduler/trigger-history', methods=['POST'])
+    def trigger_history():
+        """Manually trigger history backfill."""
+        from services.scheduler_service import trigger_history_backfill
+        trigger_history_backfill()
+        return jsonify({'status': 'success', 'message': 'History backfill triggered'})
     
     # Error handlers
     @app.errorhandler(404)
