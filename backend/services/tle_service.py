@@ -63,7 +63,7 @@ class TLEService:
             
             if current_time - last_time < limit_seconds:
                 remaining = int(limit_seconds - (current_time - last_time))
-                print(f"[TLEService] Rate limited for {key}: {remaining}s remaining")
+                print(f"[TLEService] Rate limited for {key}: {remaining}s remaining", flush=True)
                 return False
             return True
     
@@ -114,23 +114,27 @@ class TLEService:
         # Check rate limit
         rate_key = f"gp:{constellation_slug}"
         if not self._check_rate_limit(rate_key, self.RATE_LIMIT_SECONDS):
-            print(f"[TLEService] Skipping {constellation_slug} due to rate limit")
+            print(f"[TLEService] Skipping {constellation_slug} due to rate limit", flush=True)
             return (0, 0)
         
         config = self.constellations[constellation_slug]
         query = config.get('spacetrack_query')
         
         if not query:
-            print(f"[TLEService] No Space-Track query configured for {constellation_slug}")
+            print(f"[TLEService] No Space-Track query configured for {constellation_slug}", flush=True)
             return (0, 0)
         
-        print(f"[TLEService] Updating TLE for {constellation_slug}...")
+        print(f"[TLEService] Updating TLE for {constellation_slug}...", flush=True)
         
         # Fetch GP data from Space-Track
-        gp_data = spacetrack_service.get_gp_data(query, constellation_slug)
+        try:
+            gp_data = spacetrack_service.get_gp_data(query, constellation_slug)
+        except Exception as e:
+            print(f"[TLEService] Error fetching GP data: {e}", flush=True)
+            return (0, 0)
         
         if not gp_data:
-            print(f"[TLEService] No GP data returned for {constellation_slug}")
+            print(f"[TLEService] No GP data returned for {constellation_slug}", flush=True)
             return (0, 0)
         
         # Update rate limit after successful fetch

@@ -305,6 +305,7 @@ backend/env/
 backend/data/
 backend/cache/
 backend/logs/
+backend/instance/
 
 # Python compiled files
 backend/__pycache__/

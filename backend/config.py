@@ -61,21 +61,20 @@ class Config:
     
     # Multi-account pool for rate limit management and failover
     # Accounts are rotated to stay within API limits
-    # NOTE: New accounts need to be registered at space-track.org before use
+    # All accounts registered at space-track.org
     SPACETRACK_ACCOUNTS = [
         # Legacy accounts (verified working)
         {'username': '971470200@qq.com', 'password': 'Heitong1234....'},
         {'username': 'changshuo@bupt.edu.cn', 'password': 'Heitong1234....'},
-        # New accounts (need registration at space-track.org)
-        # Uncomment after registering at https://www.space-track.org/auth/createAccount
-        # {'username': '923478861@qq.com', 'password': 'FWWXJYBZDSYS2026'},
-        # {'username': '3171543674@qq.com', 'password': '3171543674_qq.com'},
-        # {'username': '1109855493@qq.com', 'password': 'citybuster_zzs123'},
-        # {'username': '1079729701@qq.com', 'password': '2026_spacetrack'},
-        # {'username': '778826712@qq.com', 'password': '778826712qq.com'},
-        # {'username': 'cursorissb@2925.com', 'password': 'enteranewpassword2026'},
-        # {'username': 'apoepo886@outlook.com', 'password': 'qwertasdfg01478963'},
-        # {'username': 'hlac7517@gmail.com', 'password': 'spacetrack123321'},
+        # New registered accounts
+        {'username': '923478861@qq.com', 'password': 'FWWXJYBZDSYS2026'},
+        {'username': '3171543674@qq.com', 'password': '3171543674_qq.com'},
+        {'username': '1109855493@qq.com', 'password': 'citybuster_zzs123'},
+        {'username': '1079729701@qq.com', 'password': '2026_spacetrack'},
+        {'username': '778826712@qq.com', 'password': '778826712qq.com'},
+        {'username': 'cursorissb@2925.com', 'password': 'enteranewpassword2026'},
+        {'username': 'apoepo886@outlook.com', 'password': 'qwertasdfg01478963'},
+        {'username': 'hlac7517@gmail.com', 'password': 'spacetrack123321'},
     ]
     
     # Legacy single account (for backward compatibility)

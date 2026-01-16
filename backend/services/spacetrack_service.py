@@ -83,7 +83,14 @@ class SpaceTrackService:
     def _get_session(self, username: str) -> requests.Session:
         """Get or create a session for an account."""
         if username not in self._sessions:
-            self._sessions[username] = requests.Session()
+            session = requests.Session()
+            # Add proper user-agent to avoid being blocked
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+            })
+            self._sessions[username] = session
         return self._sessions[username]
     
     def _is_session_valid(self, username: str) -> bool:
@@ -241,6 +248,41 @@ class SpaceTrackService:
         
         return status
     
+    def _format_query_filter(self, query_filter: str) -> str:
+        """
+        Convert query filter to proper Space-Track URL format.
+        
+        Input: "OBJECT_NAME~~STARLINK" or "OBJECT_NAME~~STARLINK,OBJECT_NAME~~TEST"
+        Output: "OBJECT_NAME/~~STARLINK/" or multiple predicates joined
+        
+        Operators: ~~(contains), ^(starts), $(ends), <>(not equal), 
+                   <, >, <=, >=, --(range), null-val
+        """
+        if not query_filter:
+            return ""
+        
+        # Handle multiple conditions (comma-separated)
+        conditions = query_filter.split(',')
+        parts = []
+        
+        for condition in conditions:
+            condition = condition.strip()
+            
+            # Parse operator and value
+            for op in ['~~', '^', '$', '<>', '<=', '>=', '<', '>', '--']:
+                if op in condition:
+                    field, value = condition.split(op, 1)
+                    parts.append(f"{field.strip()}/{op}{value.strip()}/")
+                    break
+            else:
+                # No operator found, treat as field/value
+                if '/' not in condition:
+                    parts.append(f"{condition}/")
+                else:
+                    parts.append(f"{condition}/")
+        
+        return ''.join(parts)
+    
     def get_gp_data(self, query_filter: str, constellation: str = None) -> List[Dict]:
         """
         Get General Perturbations (GP/TLE) data.
@@ -252,18 +294,21 @@ class SpaceTrackService:
         Returns:
             List of GP data dictionaries
         """
+        # Format query filter for Space-Track URL
+        formatted_filter = self._format_query_filter(query_filter)
+        
         # Build URL for GP class (latest TLEs)
         # Add DECAY_DATE/null-val to get only active satellites
-        # Add epoch/>now-30 to get recent data
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/gp/"
             f"DECAY_DATE/null-val/"
-            f"{query_filter}/"
+            f"{formatted_filter}"
             f"orderby/NORAD_CAT_ID asc/"
             f"format/json"
         )
         
         print(f"[SpaceTrack] Querying GP data: {query_filter}")
+        print(f"[SpaceTrack] URL: {url}")
         data = self._execute_query(url, QueryType.GP, constellation)
         
         if isinstance(data, list):
@@ -278,10 +323,12 @@ class SpaceTrackService:
         Returns:
             TLE text data
         """
+        formatted_filter = self._format_query_filter(query_filter)
+        
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/gp/"
             f"DECAY_DATE/null-val/"
-            f"{query_filter}/"
+            f"{formatted_filter}"
             f"orderby/NORAD_CAT_ID asc/"
             f"format/tle"
         )
@@ -302,14 +349,17 @@ class SpaceTrackService:
         Returns:
             List of SATCAT records
         """
+        formatted_filter = self._format_query_filter(query_filter)
+        
         url = (
             f"{self.BASE_URL}/basicspacedata/query/class/satcat/"
-            f"{query_filter}/"
+            f"{formatted_filter}"
             f"orderby/LAUNCH desc/"
             f"format/json"
         )
         
         print(f"[SpaceTrack] Querying SATCAT: {query_filter}")
+        print(f"[SpaceTrack] URL: {url}")
         print(f"[SpaceTrack] NOTE: SATCAT queries limited to 1/day per Space-Track policy")
         
         data = self._execute_query(url, QueryType.SATCAT, constellation)

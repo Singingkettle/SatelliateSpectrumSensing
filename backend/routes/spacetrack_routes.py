@@ -102,7 +102,7 @@ def get_recent_launches():
     limit = request.args.get('limit', 50, type=int)
     
     try:
-        launches = spacetrack_service.get_latest_launches(days)
+        launches = spacetrack_service.get_recent_launches(days)
         return jsonify({
             'days': days,
             'count': len(launches),
